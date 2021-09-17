@@ -1,0 +1,600 @@
+{
+   C__Coptind
+   Memcheck:Leak
+   fun:calloc
+   fun:C__Coptind
+   ...
+}
+
+{
+   C__serrno
+   Memcheck:Leak
+   fun:calloc
+   fun:C__serrno
+   ...
+}
+
+{
+   C__Copterr
+   Memcheck:Leak
+   fun:calloc
+   fun:C__Copterr
+   ...
+}
+
+{
+   C__Coptreset
+   Memcheck:Leak
+   fun:calloc
+   fun:C__Coptreset
+   ...
+}
+
+
+{
+   C__Coptopt
+   Memcheck:Leak
+   fun:calloc
+   fun:C__Coptopt
+   ...
+}
+
+{
+   Cglobals_get
+   Memcheck:Leak
+   fun:calloc
+   fun:Cglobals_get
+   ...
+}
+
+{
+   xrootdclient
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:_ZN8XrdNetIF9SetDomainEv
+   fun:_GLOBAL__I_XrdNetIF.cc
+   obj:/usr/lib64/libXrdUtils.so.2.0.0
+   obj:/usr/lib64/libXrdUtils.so.2.0.0
+}
+
+{
+   C__Coptarg
+   Memcheck:Leak
+   fun:calloc
+   fun:C__Coptarg
+   ...
+}
+
+{
+   C__serrno_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__serrno
+   ...
+}
+
+{
+   C__rfio_errno_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__rfio_errno
+   ...
+}
+
+{
+   C__Copterr_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__Copterr
+   ...
+}
+
+{
+   C__Coptind_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__Coptind
+   ...
+}
+
+{
+   C__Coptopt_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__Coptopt
+   ...
+}
+
+{
+   C__Coptreset_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__Coptreset
+   ...
+}
+
+{
+   C__Coptarg_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:C__Coptarg
+   ...
+}
+
+{
+   Cglobals_get_thread
+   Memcheck:Leak
+   fun:malloc
+   fun:Cthread_Getspecific
+   fun:Cthread_Getspecific_init
+   fun:Cglobals_get
+   ...
+}
+
+{
+   xrootdclient_2
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:_ZN11XrdSysUtils8ExecNameEv
+   fun:_ZN5XrdCl10DefaultEnvC1Ev
+   fun:_ZN5XrdCl10DefaultEnv10InitializeEv
+   fun:_GLOBAL__I_XrdClDefaultEnv.cc
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+}
+
+{
+   liblttng-ust
+   Memcheck:Leak
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   ...
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+}
+
+{
+   Cthread_init
+   Memcheck:Leak
+   fun:malloc
+   fun:_Cthread_addcid
+   fun:_Cthread_once
+   fun:pthread_once
+   fun:_Cthread_init
+   fun:Cthread_init
+   ...
+}
+
+{
+   libXrdUtils
+   Memcheck:Leak
+   fun:malloc
+   fun:__res_vinit
+   fun:gaih_inet
+   fun:getaddrinfo
+   fun:_ZN10XrdNetAddr3SetEPKci
+   fun:_ZN10XrdNetAddrC1Ei
+   fun:_ZN8XrdNetIF9SetDomainEv
+   fun:_GLOBAL__I_XrdNetIF.cc
+   obj:/usr/lib64/libXrdUtils.so.2.0.0
+   obj:/usr/lib64/libXrdUtils.so.2.0.0
+}
+
+{
+   liblttng-ust_3
+   Memcheck:Leak
+   fun:malloc
+   fun:add_to_global
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   ...
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+}
+
+{
+   liblttng-ust_4
+   Memcheck:Leak
+   fun:calloc
+   fun:_dl_allocate_tls
+   fun:pthread_create@@GLIBC_2.2.5
+   fun:lttng_ust_init
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+}
+
+{
+   liblttng-ust_5
+   Memcheck:Leak
+   fun:calloc
+   fun:_dl_allocate_tls
+   fun:pthread_create@@GLIBC_2.2.5
+   fun:lttng_ust_init
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+   obj:/usr/lib64/liblttng-ust.so.0.0.0
+}
+
+{
+   xrootdclient_3
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:_ZN11XrdSysUtils8ExecNameEv
+   fun:_ZN5XrdCl10DefaultEnvC1Ev
+   fun:_ZN5XrdCl10DefaultEnv10InitializeEv
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+}
+
+{
+   tape_cleaning
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon21MigrationReportPacker17reportDriveStatusEN3cta11DriveStatusE
+   fun:_ZN6castor4tape10tapeserver6daemon21TapeWriteSingleThread12TapeCleaningD1Ev
+   fun:_ZN6castor4tape10tapeserver6daemon21TapeWriteSingleThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+
+{
+   recall_packer
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon18RecallReportPacker18reportCompletedJobESt10unique_ptrIN3cta11RetrieveJobESt14default_deleteIS6_EE
+   fun:_ZN6castor4tape10tapeserver6daemon13DiskWriteTask7executeERNS2_18RecallReportPackerERNS_3log10LogContextERNS0_8diskFile15DiskFileFactoryERNS2_14RecallWatchDogE
+   fun:_ZN6castor4tape10tapeserver6daemon19DiskWriteThreadPool21DiskWriteWorkerThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+
+{
+   migration_packer
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon21MigrationReportPacker28reportEndOfSessionWithErrorsESsi
+   fun:_ZN6castor4tape10tapeserver6daemon21TapeWriteSingleThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+
+{
+   recall_packer_2
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon18RecallReportPacker28reportEndOfSessionWithErrorsESsi
+   fun:_ZN6castor4tape10tapeserver6daemon19DiskWriteThreadPool21DiskWriteWorkerThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+
+{
+   recall_packer_3
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon18RecallReportPacker18reportEndOfSessionEv
+   fun:_ZN6castor4tape10tapeserver6daemon19DiskWriteThreadPool21DiskWriteWorkerThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+
+{
+   recall_packer_4
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN6castor4tape10tapeserver6daemon18RecallReportPacker17reportDriveStatusEN3cta11DriveStatusE
+   fun:_ZN6castor4tape10tapeserver6daemon20TapeReadSingleThread12TapeCleaningD1Ev
+   fun:_ZN6castor4tape10tapeserver6daemon20TapeReadSingleThread3runEv
+   fun:_ZN6castor6server6Thread14pthread_runnerEPv
+   fun:start_thread
+   fun:clone
+}
+{
+   oracle_lfvini1
+   Memcheck:Cond
+   fun:__intel_sse2_strcpy
+   fun:lfvini1
+   ...
+}
+{
+   oracle_slpmadp
+   Memcheck:Cond
+   fun:__intel_sse2_strcpy
+   fun:slpmadp
+   ...
+}
+{
+   oracle_slzsetevar
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:slzsetevar
+   ...
+}
+{
+   oracle_ssMemMalloc_1
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:ssMemMalloc
+   ...
+}
+{
+   oracle_ssMemMalloc_2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:ssMemMalloc
+   ...
+}
+{
+   oracle_ssMemCalloc_1
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:ssMemCalloc
+   ...
+}
+{
+   oracle_ssMemCalloc_2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:ssMemCalloc
+   ...
+}
+{
+   oracle_nlddinit_1
+   Memcheck:Addr16
+   fun:__intel_sse2_strlen
+   fun:nlddinit
+   ...
+}
+{
+   oraccle_nlddinit_2
+   Memcheck:Addr16
+   fun:nlddinit
+   ...
+}
+{
+   oracle_dbgc_iset_adr_par1_1
+   Memcheck:Addr16
+   fun:__intel_sse2_strcpy
+   fun:dbgc_iset_adr_par1
+   ...
+}
+{
+   oracle_dbgc_iset_adr_par1_2
+   Memcheck:Addr16
+   fun:__intel_sse2_strlen
+   fun:dbgc_iset_adr_par1
+   ...
+}
+{
+   oracle_dbgc_iset_adr_par1_3
+   Memcheck:Addr16
+   fun:dbgc_iset_adr_par1
+   ...
+}
+{
+   oracle_dbgc_iset_adr_par1_4
+   Memcheck:Addr4
+   fun:__intel_sse2_strcpy
+   fun:dbgc_iset_adr_par1
+   ...
+}
+{
+   oracle_nlstddt_do_alter_trace
+   Memcheck:Addr16
+   fun:__intel_sse2_strlen
+   fun:nlstddt_do_alter_trace
+   ...
+}
+{
+   oracle_slpmloclfv
+   Memcheck:Addr16
+   fun:slpmloclfv
+   ...
+}
+{
+   oracle_skgfrpini
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:__alloc_dir
+   fun:skgfrpini
+   ...
+}
+{
+   oracle_lxldalc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:lxldalc
+   ...
+}
+{
+   oracle_sltskyc
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:sltskyc
+   ...
+}
+{
+   oracle_ssOswDlopen_1
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+   ...
+}
+{
+   oracle_ssOswDlopen_2
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:expand_dynamic_string_token
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+   ...
+}
+{
+   oracle_ssOswDlopen_3
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+}
+{
+   oracle_ssOswDlopen_4
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:_dl_signal_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+   ...
+}
+{
+   oracle_ssOswDlopen_5
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dl_check_map_versions
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+   ...
+}
+{
+   oracle_ssOswDlopen_6
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   fun:ssOswDlopen
+}
+{
+   oracle_OCIEnvCreate
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:sltsini
+   fun:ltsini
+   fun:kpummpin
+   fun:kpuenvcr
+   fun:OCIEnvCreate
+   ...
+}
+{
+   XrdSysUtils_ExecName
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strdup
+   fun:_ZN11XrdSysUtils8ExecNameEv
+   fun:_ZN5XrdCl10DefaultEnvC1Ev
+   fun:_ZN5XrdCl10DefaultEnv10InitializeEv
+   obj:/usr/lib64/libXrdCl.so.2.0.0
+   fun:_dl_init
+   obj:/usr/lib64/ld-2.17.so
+}
+{
+   dl_init_libceph_common
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlopen@@GLIBC_2.2.5
+   obj:/usr/lib64/ceph/libceph-common.so.0
+   fun:_dl_init
+   obj:/usr/lib64/ld-2.17.so
+}
+{
+   repack_getCandidateList
+    Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   fun:_ZNSs4_Rep9_S_createEmmRKSaIcE
+   fun:_ZNSs4_Rep8_M_cloneERKSaIcEm
+   fun:_ZNSs6assignERKSs
+   fun:_ZN3cta11objectstore11RepackQueue16getCandidateListEmSt3setISsSt4lessISsESaISsEE
+}
+
+{
+   retrieveQueueShard_getCandidateJobList
+   Memcheck:Leak
+   match-leak-kinds: indirect
+   fun:_Znwm
+   fun:_ZNSs4_Rep9_S_createEmmRKSaIcE
+   fun:_ZNSs4_Rep8_M_cloneERKSaIcEm
+   fun:_ZNSsC1ERKSs
+   fun:_ZN3cta11objectstore18RetrieveQueueShard19getCandidateJobListEmmSt3setISsSt4lessISsESaISsEE
+   fun:_ZN3cta11objectstore13RetrieveQueue16getCandidateListEmmSt3setISsSt4lessISsESaISsEE
+}

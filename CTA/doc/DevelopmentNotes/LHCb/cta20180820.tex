@@ -1,0 +1,67 @@
+\documentclass{lhcb+cta}
+\renewcommand{\subheading}{Notes after CTA internal discussion on 20 August 2018}
+
+\begin{document}
+
+German: The key point missing here is that it is up to LHCb to transfer the file from EOSLHCB to EOSCTALHCB and check from there. This implies that LHCb also have to do space management on EOSLHCB - they can remove the file from disk once they have processed it and it is safely on tape on EOSCTALHCB.
+
+CTA Meeting Minutes: Data workflows we would like to see:
+
+LHCb will see two storage elements:
+
+\begin{itemize}
+    \item A big EOS disk-only instance.
+    \item A small EOS/CTA instance behind the big EOS disk-only instance.
+\end{itemize}
+        
+The big EOS disk-only instance will be responsible for receiving data from the experiment's DAQ system and for carrying out reprocessing, analysis and tier 1 data transfers. The small EOS/CTA instance will be dedicated to staging files between the big EOS instance and tape.  The small instance will not for example be available to tier 1 GridFTP requests.
+
+The expected lifecycle of a file going from DAQ to tape is:
+\begin{enumerate}
+    \item Copy file from the DAQ to the big EOS disk-only instance.
+    \item Copy file from the big EOS disk-only instance to the small EOS/CTA instance.
+    \item Query the small EOS/CTA instance until the file is safely stored on tape.
+    \item Delete the file if necessary from the big EOS disk-only instance.
+\end{enumerate}
+
+\section*{Massimo's Notes}
+
+This is a summary which might be useful to prepare the meeting with our LHCb colleagues.
+
+\begin{itemize}
+    \item CTA is getting ready: preview stage
+    \begin{itemize}
+        \item No real migration before LS2 (2018 data still going to CASTOR)
+        \begin{itemize}
+            \item Preparation steps (at least understanding the workflows and the product) can be done now
+            \item ST offers a testbed to LHCb
+        \end{itemize}
+        \item Usecases
+        \begin{itemize}
+            \item We see 3 main actors: DAQ (Pit->CC), FTS (CC->T1) and Dirac (CASTOR->EOS, batch upload/download by workernodes)
+            \item Special case: Removal of RAW at the Pit (aka how to decide when it is safe to remove a copy on the DAQ side)
+        \end{itemize}
+    \end{itemize}
+    CTA will be SRM free and essentially a service in the CC (no gFTP)
+    \begin{itemize}
+        \item Protocols: xrootd (and in future also HTTP)
+        \item Implications for DIRAC?
+        \begin{itemize}
+            \item Other experiments using DIRAC (as ILC)
+        \end{itemize}
+    \end{itemize}
+    \item Expectations
+    \begin{itemize}
+        \item Describe what ATLAS and CMS are doing since 2017 and ALICE for the 2018 run
+        \item In this model EOSLHCb will be the receiving end for data transfers (from DAQ), be the source for export to LCG sites; feed/receive data from/to CTA
+    \end{itemize}
+    \item CTA can be interrogated to know if a file has been just received (disk cache) or the file is already on tape (cfr. m-bit in CASTOR)
+    \item CTA cache is small and optimised to match user activity and tape handling, that's why it is not directly exposed, for example, to long-running batch jobs
+    \item CTA is prepared to consider future use cases ("do more with tapes" mantra) but this will require discussions (mutual understanding) to put in place a good solution
+\end{itemize}
+    
+My take is that we are all on the same page. I think it is important (as mentioned by everyone) that we speak with one voice and proposed a coherent view before proposing alternative scenarios. The fact that "ATLAS and CMS are happy with this model" will probably simplify the discussion.
+
+I think it is important to verify if we should have also Nico Neufeld since (at least historically) he is in charge of the data removal at the pit.
+
+\end{document}

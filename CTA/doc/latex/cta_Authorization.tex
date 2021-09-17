@@ -1,0 +1,25 @@
+\chapter{CTA Authorization}
+
+\section{\glspl{sss}}
+
+\glspl{sss} are used to authenticate communications using the XRoot protocol, which is the case in the following
+situations:
+\begin{enumerate}
+\item Internal communication between the EOS \texttt{mgm} and \texttt{fst} daemons.
+\item Communication between the Tape Server and the EOS \texttt{mgm} daemon. (On the other hand, communication between
+the Tape Server and the EOS \texttt{fst} daemon does not use SSS; this is handled by internal redirection within the
+XRoot library layer.)
+\item Communication between the EOS \texttt{mgm} daemon and the CTA Front End daemon.
+\end{enumerate}
+
+\section{Kerberos}
+
+Kerberos authentication is used in the following situations:
+\begin{enumerate}
+\item Communication between the CTA Admin tool and the CTA Front End daemon. In this case, Kerberos is the only available
+authentication mechanism.
+\item Communication between EOS users (Atlas, CMS, etc.) and the EOS \texttt{mgm} daemon. In this case, Kerberos is one
+of several options. Authentication can be performed by any mechanism which is supported by both XRoot and EOS, for
+example SSS or standard UNIX authentication.
+\end{enumerate}
+

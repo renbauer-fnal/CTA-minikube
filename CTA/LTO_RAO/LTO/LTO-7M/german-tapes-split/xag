@@ -1,0 +1,12 @@
+L70254   L70254 IBM1L8   9TC      aul r_backup_1       855.48GiB 20180821 FULL
+L70255   L70255 IBM1L8   9TC      aul r_atlas_prod     791.86GiB 20180821 FULL
+L70256   L70256 IBM1L8   9TC      aul r_backup         814.46GiB 20180821 FULL
+L70258   L70258 IBM1L8   9TC      aul r_cms_fam        818.71GiB 20180821 FULL
+L70259   L70259 IBM1L8   9TC      aul r_lhcb           788.60GiB 20180821 FULL
+L70263   L70263 IBM1L8   9TC      aul r_cms_fam        823.82GiB 20180821 FULL
+L70265   L70265 IBM1L8   9TC      aul r_cms_fam        805.62GiB 20180821 FULL
+L70268   L70268 IBM1L8   9TC      aul r_backup_1       791.79GiB 20180821 FULL
+L70273   L70273 IBM1L8   9TC      aul r_atlas_prod     813.40GiB 20180820 FULL
+L70274   L70274 IBM1L8   9TC      aul r_atlas_raw      805.02GiB 20180820 FULL
+L70278   L70278 IBM1L8   9TC      aul r_cms_fam        826.84GiB 20180821 FULL
+L70281   L70281 IBM1L8   9TC      aul r_compass        792.08GiB 20180821 FULL

@@ -1,0 +1,44 @@
+\documentclass[10pt,a4paper]{article}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+\usepackage[margin=12mm]{geometry}
+\usepackage{hyperref}
+
+\usepackage[underline=true,rounded corners=false]{pgf-umlsd}
+
+\begin{document}
+
+\section{Getting the next retrieval mount and its file transfer jobs}
+
+Figure \ref{fig:get_next} is a sequence diagram showing how a tape server gets the next retrieval mount from the scheduler and then the transfer jobs for that mount.
+\begin{figure}[h]
+  \resizebox{\linewidth}{!}{
+    \begin{sequencediagram}
+      \newthread{t}{:TapeServer}
+      \newinst[5]{s}{:Scheduler}
+      \newinst{m}{:Mount}
+      \newinst{j}{:Job}
+      \begin{call}{t}{1. getNextMount(logicalLibrary, drive)}{s}{TapeMount}
+        \begin{messcall}{s}{2. create}{m}
+        \end{messcall}
+      \end{call}
+      \postlevel
+      \begin{messcall}{t}{3. getMountType()}{m}
+      \end{messcall}
+      \begin{messcall}{t}{4. getVid()}{m}
+      \end{messcall}
+      \begin{call}{t}{5. getNextJob(logicalLibrary, drive)}{m}{Job}
+        \begin{messcall}{m}{6. create}{j}
+        \end{messcall}
+      \end{call}
+      \postlevel
+      \begin{messcall}{t}{7.getTransferDetails}{j}
+      \end{messcall}
+      \begin{messcall}{t}{8.complete()}{j}
+      \end{messcall}
+    \end{sequencediagram}
+  }
+  \caption{Getting the next retrieval mount and its file transfer jobs}
+  \label{fig:get_next}
+\end{figure}
+\end{document}

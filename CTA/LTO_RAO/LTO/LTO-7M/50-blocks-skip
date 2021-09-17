@@ -1,0 +1,108 @@
+#!/bin/bash
+# This script is intended to fill a tape with 5 GiB simple dummy files
+# Then do fsf n/rewinds to get position speeds for files
+
+VID='L70010'
+
+echo 'fill_simple_file_skip'
+echo "Fill tape $VID with simple dummy files, skip to each of the files, version of 11 August 2013."
+echo
+
+DEVICE='/dev/tape'
+
+unset LANG
+
+let FILESIZE=(5*1024*1024*1024) # filesize in bytes
+let BLOCKSIZE=(256*1024)      # blocksize in bytes
+let NRBLOCKS=($FILESIZE/$BLOCKSIZE) # number of block needed to create the file
+
+echo 'FILL_SIMPLE_FILE_SKIP'
+echo 'Input device: /dev/zero'
+echo "Output device: $DEVICE"
+echo 'Basic file size: ' $FILESIZE' bytes'
+echo 'Blocksize used: ' $BLOCKSIZE' bytes'
+echo "Number of blocks of $BLOCKSIZE bytes to write file of $FILESIZE is $NRBLOCKS"
+echo
+
+sdparm --page=37 --set=8:7:1=0 $DEVICE # FSA enabled (default)
+set FSA='ON'
+sdparm --page=37 --set=5:0:1=1 $DEVICE # Physical EOT
+set EOT='physical'
+sdparm --page=37 --hex /dev/nst0
+echo "VID: $VID EOT: $EOT FSA: $FSA"
+
+date
+mt -f $DEVICE rewind
+mt -f $DEVICE setblk 0
+mt -f $DEVICE compression 0
+mt -f $DEVICE status
+
+echo "$0: Starting fill"
+
+echo 'Fill tape?  Y/N ...'
+#read UREP
+UREP='N'
+echo "Reply: $UREP"
+
+if [ $UREP = 'y' -o $UREP = 'Y' ]
+then
+
+  echo 'User wants to fill this tape, start filling...'
+
+  FILECOUNT=1
+  DDSTATUS=0
+  while [ $DDSTATUS == 0 ]
+  do
+    echo "dd if=/dev/zero ibs=$BLOCKSIZE of=$DEVICE obs=$BLOCKSIZE count=$NRBLOCKS"
+    dd if=/dev/zero ibs=$BLOCKSIZE of=$DEVICE obs=$BLOCKSIZE count=$NRBLOCKS
+    DDSTATUS=$?
+
+    echo "$0: wrote file $FILECOUNT, with 'dd' status $DDSTATUS"
+    let FILECOUNT+=1
+  done
+
+  date
+
+  echo 'Ended fill after writing '$FILECOUNT' files'
+
+else
+
+  echo 'User does not want to fill this tape, start skipping...'
+
+fi
+
+#exit -1
+
+mt -f $DEVICE status
+mt -f $DEVICE rewind
+mt -f $DEVICE setblk 0
+mt -f $DEVICE compression 0
+
+sdparm --page=0x30,0x43 --hex /dev/tape
+# Disable Archive Unload
+echo "Disabling Archive Unload ..."
+sdparm --page=0x30,0x43 --set=4:1:1=0 /dev/tape
+# Disable BOP caching
+echo "Disabling BOP caching ..."
+sdparm --page=0x30,0x43 --set=4:0:1=1 /dev/tape
+sdparm --page=0x30,0x43 --hex /dev/tape
+
+echo "*"
+echo "* Rewound tape, now start skip to each file"
+echo "*"
+
+for i in `seq 0 50 100000`
+do
+  date
+  mt -f $DEVICE status | grep BOT
+  BEFORESEEKTIME=`date +%s%N`
+  /usr/sbin/scsitape -f /dev/tape seek $i
+  AFTERSEEKTIME=`date +%s%N`
+  let TIMETOSEEK=(AFTERSEEKTIME-BEFORESEEKTIME)
+  BLOCKID=`/usr/sbin/tapeinfo -f /dev/tape | grep Position | cut -f2 -d':' | awk '{print $1}'`
+  BEFOREREWINDTIME=`date +%s%N`
+  mt rewind
+  AFTERREWINDIME=`date +%s%N`
+  let TIMETOREWIND=(AFTERREWINDIME-BEFOREREWINDTIME)
+  echo "### Block: $i Block: $BLOCKID Seek time: $TIMETOSEEK Rewind time: $TIMETOREWIND"
+done

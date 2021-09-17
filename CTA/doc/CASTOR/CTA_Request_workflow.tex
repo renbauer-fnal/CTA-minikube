@@ -1,0 +1,203 @@
+\documentclass{article}
+
+\usepackage[latin1]{inputenc}
+\usepackage{tikz}
+\usepackage[left=1cm, right=1cm, top=1cm, bottom=0.5cm]{geometry}
+\usetikzlibrary{shapes,shapes.geometric,arrows}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+
+\begin{document}
+\pagestyle{empty}
+
+% Define block styles
+\tikzstyle{decision} = [diamond, draw, fill=blue!20, 
+    text width=4.5em, text badly centered, node distance=2.5cm, inner sep=0pt]
+\tikzstyle{block} = [rectangle, draw, fill=blue!20, 
+    text width=7em, text centered, rounded corners, minimum height=3em]
+\tikzstyle{line} = [draw, -latex']
+\tikzstyle{cloud} = [draw, ellipse,fill=red!20, node distance=3cm,
+    minimum height=2em]
+\tikzstyle{endCircle} = [draw, circle, fill=black, minimum size = 0.5cm]
+
+\tikzstyle{arrow} = [thin,->,>=stealth]
+
+\begin{center}
+\begin{tikzpicture}[node distance = 1.5cm, title/.style = {font=\bfseries, align=center}]
+    % Place nodes
+    \node [above, font=\bfseries] (b_title) {User Retrieve Job workflow};
+    \node [block, below of=b_title, text width=15em] (b_init) {Submission of the Retrieve Request by the user};
+    \node [block, below of=b_init, text width=15em] (b_statusTTFU) {Status RJS\_ToTransferForUser};
+    \node [block, below of=b_statusTTFU, text width=15em] (b_queueRQTTFU) {Queue in RetrieveQueueToTransferForUser (by vid)};
+    \node [decision, below of=b_queueRQTTFU] (d_transferSucceeded) {Transfer succeeded ?};
+    \node [block, right of=d_transferSucceeded, node distance = 4cm] (b_requestDeleted) {Delete request};
+    \node [endCircle, right of=b_requestDeleted, node distance = 2.5cm] (cir_end1) {};
+    \node [block, below of=d_transferSucceeded, node distance = 2.5cm, text width=15em] (b_addTransferFailure) {Add transfer failure stats to Retrieve Job};
+    \node [decision, below of=b_addTransferFailure, text width = 6em, node distance = 2.7cm] (d_nbRetrieveRetries) {Number of retries {\textgreater =} max retries ?};
+    \node [block, below of=d_nbRetrieveRetries, node distance = 2.5cm, text width=15em] (b_statusTRTUFF1) {Status RJS\_ToReportToUserForFailure};
+    \node [block, below of=b_statusTRTUFF1, text width = 15em] (b_queueRQTRFU) {Queue in RetrieveQueueToReportForUser (by vid)};
+    \node [block, below of=b_queueRQTRFU] (b_reportFailureEOS) {Report failure to EOS};
+    \node [decision, below of=b_reportFailureEOS] (d_reportSucceeded) {Report succeeded ?};
+    \node [decision, below of=d_reportSucceeded, node distance = 4cm] (d_nbReportRetries) {Number of report retries {\textgreater =} max retries ?};
+    \node [block, right of=d_nbReportRetries, node distance = 4cm] (b_statusFailed) {Status RJS\_Failed};
+    \node [block, left of=d_nbReportRetries, node distance = 4cm] (b_statusTRTUFF) {{Status RJS\_ToReport ToUserForFailure}};
+    \node [block, right of=b_statusFailed, node distance = 4cm] (b_queueRQF) {Queue in RetrieveQueueFailed (by vid)};
+    \node [endCircle, right of=b_queueRQF, node distance = 2.5cm] (cir_end2) {};
+    % Draw edges
+    \path [line] (b_init) -- (b_statusTTFU);
+    \path [line] (b_statusTTFU) -- (b_queueRQTTFU);
+    \path [line] (b_queueRQTTFU) -- node [right, color=black] {Pop + Retrieve in progress}(d_transferSucceeded);
+    \path [line] (d_transferSucceeded) -- node [above] {yes} (b_requestDeleted);
+    \path [line] (b_requestDeleted) -- (cir_end1);
+    \path [line] (d_transferSucceeded) -- node [right] {no} (b_addTransferFailure);
+    \path [line] (b_addTransferFailure) -- (d_nbRetrieveRetries);
+    \draw [arrow] (d_nbRetrieveRetries.west) |- node[anchor=north east] {no} ([shift={(-2cm,0cm)}]d_nbRetrieveRetries.west) |- (b_queueRQTTFU.west);
+    \path [line] (d_nbRetrieveRetries.south) -- node[right] {yes} (b_statusTRTUFF1);
+    \path [line] (b_statusTRTUFF1) -- (b_queueRQTRFU);
+    \path [line] (b_queueRQTRFU) -- node [right] {pop} (b_reportFailureEOS);
+    \path [line] (b_reportFailureEOS) -- (d_reportSucceeded);
+    \path [line] (d_reportSucceeded) -| node [above] {yes} (b_statusFailed);
+    \path [line] (d_reportSucceeded) -- node [right] {no} (d_nbReportRetries);
+    \path [line] (d_nbReportRetries) -- node [above] {yes} (b_statusFailed);
+    \path [line] (b_statusFailed) -- (b_queueRQF);
+    \path [line] (d_nbReportRetries) -- node [above] {no} (b_statusTRTUFF);
+    \path [line] (b_statusTRTUFF) |- (b_queueRQTRFU);
+    \path [line] (b_queueRQF) -- (cir_end2);
+\end {tikzpicture}
+\end{center}
+\newpage
+
+\begin{center}
+\begin{tikzpicture}[node distance = 1.5cm, title/.style = {font=\bfseries, align=center}]
+    % Place nodes
+    \node [above, font=\bfseries] (b_title) {Repack Retrieve Request workflow};
+    \node [block, below of=b_title, text width=15em] (b_init) {Retrieve subrequest created from the Repack Request expansion};
+    \node [block, below of=b_init, text width=15em] (b_statusTTFU) {Status RJS\_ToTransferForUser};
+    \node [block, below of=b_statusTTFU, text width=15em] (b_queueRQTTFU) {Queue in RetrieveQueueToTransferForUser (by vid)};
+    \node [decision, below of=b_queueRQTTFU] (d_transferSucceeded) {Transfer succeeded ?};
+	\node [block, right of=d_transferSucceeded, node distance = 7cm, text width=15em] (b_statusTRTRFS) {Status RJS\_ToReportTo-RepackForSuccess};
+    \node [block, below of=b_statusTRTRFS, node distance = 2cm, text width=15em] (b_queueInRQTRTRFS) {Queue in RetrieveQueueToReportToRepackForSuccess (by Repack Request address)};
+    \node [block, below of=b_queueInRQTRTRFS,node distance = 3cm] (b_updateRepackRequestSuccess) {Update the Repack Request metadata with the success};
+    \node [block, below of=b_updateRepackRequestSuccess,node distance = 3cm] (b_transformedIntoArchive) {Retrieve Request transformed into Archive Request};
+    \node [endCircle, below of=b_transformedIntoArchive, node distance = 2cm] (cir_end1) {};
+    \node [block, below of=d_transferSucceeded, node distance = 2.5cm, text width=15em] (b_addTransferFailure) {Add transfer failure stats to Retrieve Job};
+    \node [decision, below of=b_addTransferFailure, text width = 6em, node distance = 2.7cm] (d_nbRetrieveRetries) {Number of retries {\textgreater =} max retries ?};
+    \node [block, below of=d_nbRetrieveRetries, node distance = 2.7cm, text width = 15em] (b_statusTRTRFF) {Status RJS\_ToReport-ToRepackForFailure};
+    \node [block, below of=b_statusTRTRFF, text width = 15em, node distance = 2cm] (b_queueRQTRFU) {Queue in RetrieveQueueToReportToRepackForFailure (by Repack Request address};
+    \node [block, below of=b_queueRQTRFU, node distance = 2cm, text width = 15em] (b_updateRepackRequestFailures) {Update the repack request metadata with the failure};
+    \node [block, below of=b_updateRepackRequestFailures, node distance = 2cm, text width = 15em] (b_deleteRetrieveSubrequest) {Delete the failed retrieve subrequest};
+    \node [endCircle, below of=b_deleteRetrieveSubrequest, node distance = 1.5cm] (cir_end2) {};
+    % Draw edges
+    \path [line] (b_init) -- (b_statusTTFU);
+    \path [line] (b_statusTTFU) -- (b_queueRQTTFU);
+    \path [line] (b_queueRQTTFU) -- node [right, color=black] {Pop + Retrieve in progress}(d_transferSucceeded);
+    \path [line] (d_transferSucceeded) -- node [above] {yes} (b_statusTRTRFS);
+	\path [line] (b_statusTRTRFS) -- (b_queueInRQTRTRFS);
+    \path [line] (b_queueInRQTRTRFS) -- node [right] {pop} (b_updateRepackRequestSuccess);
+    \path [line] (b_updateRepackRequestSuccess) -- (b_transformedIntoArchive);
+    \path [line] (b_transformedIntoArchive) -- (cir_end1);
+    \path [line] (d_transferSucceeded) -- node [right] {no} (b_addTransferFailure);
+    \path [line] (b_addTransferFailure) -- (d_nbRetrieveRetries);
+    \draw [arrow] (d_nbRetrieveRetries.west) |- node[anchor=north east] {no} ([shift={(-2cm,0cm)}]d_nbRetrieveRetries.west) |- (b_queueRQTTFU.west);
+    \path [line] (d_nbRetrieveRetries.south) -- node[right] {yes} (b_statusTRTRFF);
+    \path [line] (b_statusTRTRFF) -- (b_queueRQTRFU);
+    \path [line] (b_queueRQTRFU) -- node [right] {pop} (b_updateRepackRequestFailures);
+    \path [line] (b_updateRepackRequestFailures) -- (b_deleteRetrieveSubrequest);
+    \path [line] (b_deleteRetrieveSubrequest) -- (cir_end2);
+\end {tikzpicture}
+\end{center}
+
+\newpage
+
+\begin{center}
+\begin{tikzpicture}[node distance = 1.5cm, title/.style = {font=\bfseries, align=center}]
+    % Place nodes
+    \node [above, font=\bfseries] (b_title) {User Archive Request workflow};
+    \node [block, below of=b_title, text width=15em] (b_init) {Submission of the Archive Request by the user};
+    \node [block, below of=b_init, text width=15em] (b_statusTTFU) {Status AJS\_ToTransferForUser};
+	\node [block, below of=b_statusTTFU, text width=15em] (b_queueAQTTFU) {Queue in ArchiveQueueToTransferForUser (by tapepool)};
+	\node [decision, below of=b_queueAQTTFU] (d_transferSucceeded) {Transfer succeeded ?};
+	\node [block, right of=d_transferSucceeded, text width=15em,node distance = 7cm] (b_statusTRTUFT) {Status AJS\_ToReport-ToUserForTransfer};
+	\node [block, below of=b_statusTRTUFT, text width=15em] (b_queueInAQTRFU) {Queue in ArchiveQueueToReportForUser (by tapepool)};
+	\node [block, below of=b_queueInAQTRFU, text width=15em] (b_reportJobToEOS) {Report job success/failure to EOS};
+	\node [decision, below of=b_reportJobToEOS] (d_reportSucceeded) {Report succeeded ?};
+	\node [block, below of=d_reportSucceeded, text width=15em, node distance = 2.5cm] (b_addReportFailureStats) {Add report failure stats to Archive Request};
+	\node [block, below of=d_transferSucceeded, text width=15em, node distance=2.5cm] (b_addTransferFailure) {Add transfer failure stats to Archive Request};
+    \node [block, above right=0.05cm and 1cm of d_reportSucceeded, text width=10em, node distance = 3cm] (b_jobDeleted) {Delete Archive job};
+    \node [endCircle, right of=b_jobDeleted, node distance = 3.5cm] (cir_end1) {};
+	\node [block, below of=d_reportSucceeded, text width=15em, node distance = 2.5cm] (b_addReportFailureStats) {Add report failure stats to Archive Request};
+	\node [decision, below of=b_addReportFailureStats] (d_maxReportRetries) {Number of retries {\textgreater =} max retries ?};
+	\node [block, below of=d_maxReportRetries,node distance=2.8cm, text width=15em] (b_statusFailed) {Status AJS\_Failed};
+    \node [block, below of=b_statusFailed, text width=15em] (b_queueAQF) {Queue in ArchiveQueueFailed (by tapepool)};
+    \node [endCircle, below of=b_queueAQF] (cir_end2) {};
+    \node [decision, below of=b_addTransferFailure] (d_maxTransferRetries) {Number of retries {\textgreater =} max retries ?};
+    \node [block, below of=d_maxTransferRetries, text width=15em, node distance = 3cm] (b_statusTRTUFF) {Status AJS\_ToReport-ToUserForFailure};
+    % Draw edges
+    \path [line] (b_init) -- (b_statusTTFU);
+    \path [line] (b_statusTTFU) -- (b_queueAQTTFU);
+	\path [line] (b_queueAQTTFU) -- node [right, color=black] {Pop + Archive in progress}(d_transferSucceeded);
+    \path [line] (d_transferSucceeded) -- node [right] {no} (b_addTransferFailure);
+	\path [line] (d_transferSucceeded) -- node [above] {yes} (b_statusTRTUFT);
+	\path [line] (b_addTransferFailure) -- (d_maxTransferRetries);
+	\draw [arrow] (d_maxTransferRetries.west) |- node[anchor=north east] {no} ([shift={(-2cm,0cm)}]d_maxTransferRetries.west) |- (b_queueAQTTFU.west);
+    \path [line] (d_maxTransferRetries) -- node [right] {yes} (b_statusTRTUFF);
+    \draw [arrow] (b_statusTRTUFF.east) -| ([shift={(0.5cm,0cm)}]b_statusTRTUFF.east) |- (b_queueInAQTRFU.west);
+    \path [line] (b_statusTRTUFT) -- (b_queueInAQTRFU);
+    \path [line] (b_queueInAQTRFU) -- node [right] {pop} (b_reportJobToEOS);
+    \path [line] (b_reportJobToEOS) -- (d_reportSucceeded);
+    \path [line] (d_reportSucceeded) -- node [below right] {yes (job successful)} (b_jobDeleted);
+	\draw [arrow] (d_reportSucceeded.south east) -| node [right] {yes (job failed)} ([shift={(3cm,0cm)}]d_reportSucceeded.south east) |- (b_statusFailed.east);
+    \path [line] (b_jobDeleted) -- (cir_end1);
+    \path [line] (d_reportSucceeded) -- node [right] {no} (b_addReportFailureStats);
+	\path [line] (b_addReportFailureStats) -- (d_maxReportRetries);
+    \draw [arrow] (d_maxReportRetries.west) |- node[anchor=north east] {no} ([shift={(-2cm,0cm)}]d_maxReportRetries.west) |- (b_queueInAQTRFU.west);
+	\path [line] (d_maxReportRetries) -- node [right] {yes} (b_statusFailed);
+    \path [line] (b_statusFailed) -- (b_queueAQF);
+    \path [line] (b_queueAQF) -- (cir_end2);
+\end {tikzpicture}
+\end{center}
+\newpage
+
+\begin{center}
+\begin{tikzpicture}[node distance = 2cm, title/.style = {font=\bfseries, align=center}]
+    % Place nodes
+    \node [above, font=\bfseries] (b_title) {Repack Archive Request workflow};
+    \node [block, below of=b_title, text width=15em] (b_RRTransformedIntoAR) {Retrieve Request transformed into Archive Request};
+    \node [decision, below of=b_RRTransformedIntoAR, text width=8em] (d_transformationSuccess) {Transformation\\success ?};
+    \node [block, right of=d_transformationSuccess, node distance = 6cm, text width=15em] (b_reportTransformationFailureToRepackRequest) {Record failed Archive Job to Repack Request};
+    \node [block, below of=b_reportTransformationFailureToRepackRequest, text width=15em] (b_deleteArchiveJob) {Delete Archive Job};
+    \node [endCircle, right of=b_deleteArchiveJob,node distance=4cm] (cir_end1) {}; 
+    \node [block, below of=d_transformationSuccess, text width=15em,node distance = 3cm] (b_statusAJSToTransferForRepack) {Status AJS\_ToTransferForRepack};
+    \node [block, below of=b_statusAJSToTransferForRepack, text width=15em] (b_queueAQTTFR) {Queue in ArchiveQueueToTransferForRepack (by tapepool)};
+    \node [decision, below of=b_queueAQTTFR] (d_transferSucceeded) {Transfer succeeded ?};
+	\node [block, below of=d_transferSucceeded, text width=15em, node distance = 3cm] (b_statusTRTRFS) {Status AJS\_ToReportTo-RepackForSuccess};
+    \node [block, below of=b_statusTRTRFS, text width=15em] (b_queueAQTRTRFS) {Queue in ArchiveQueueToReportToRepackForSuccess (by Repack Request address)};
+	\node [decision, right of=d_transferSucceeded, node distance = 7cm] (d_maxTransferRetries) {Number of retries {\textgreater =} max retries ?};
+    \node [block, below of=d_maxTransferRetries, text width=15em,node distance=3cm] (b_StatusTRTRFF) {Status AJS\_ToReportTo-RepackForFailure};
+	\node [block, below of=b_StatusTRTRFF, text width=15em] (b_queueAQTRTRFF) {Queue in ArchiveQueueToReportToRepackForFailure (by Repack Request address)};
+    \node [block,below of=b_queueAQTRTRFF] (b_updateRepackMetadata) at ($(b_queueAQTRTRFS)!0.5!(b_queueAQTRTRFF)$){Update Repack Request metadata};
+	\node [block, below of=b_updateRepackMetadata, text width=15em] (b_deleteArchiveJob2) {Delete Archive Job};
+    \node [endCircle, below of=b_deleteArchiveJob2,node distance=1.5cm] (cir_end2) {};
+	% Draw edges
+    \path [line] (b_RRTransformedIntoAR) -- (d_transformationSuccess);
+    \path [line] (d_transformationSuccess) -- node [above] {no} (b_reportTransformationFailureToRepackRequest);
+   	\path [line] (b_reportTransformationFailureToRepackRequest) -- (b_deleteArchiveJob);
+    \path [line] (b_deleteArchiveJob) -- (cir_end1);
+    \path [line] (d_transformationSuccess) -- node [right] {yes} (b_statusAJSToTransferForRepack);
+    \path [line] (b_statusAJSToTransferForRepack) -- (b_queueAQTTFR);
+    \path [line] (b_queueAQTTFR) -- node[right] {pop + Archive in progress} (d_transferSucceeded);
+    \path [line] (d_transferSucceeded) -- node [right] {yes} (b_statusTRTRFS);
+    \path [line] (b_statusTRTRFS) -- (b_queueAQTRTRFS);
+	\path [line] (b_deleteArchiveJob2) -- (cir_end2);
+	\path [line] (d_transferSucceeded) -- node [above]{no} (d_maxTransferRetries);
+    \path [line] (d_maxTransferRetries) |- node [right]{no} (b_queueAQTTFR);
+	\path [line] (d_maxTransferRetries) -- node [right]{yes} (b_StatusTRTRFF);
+    \path [line] (b_StatusTRTRFF) -- (b_queueAQTRTRFF);
+	\path [line] (b_queueAQTRTRFF) |- node [right] {pop} (b_updateRepackMetadata);
+	\path [line] (b_queueAQTRTRFS) |- node [left] {pop} (b_updateRepackMetadata);
+	\path [line] (b_updateRepackMetadata) -- (b_deleteArchiveJob2);
+	\path [line] (b_deleteArchiveJob2) |- (cir_end2);
+\end {tikzpicture}
+\end{center}
+
+\end{document}

@@ -1,0 +1,6 @@
+#!/bin/bash
+# exit from the script on any error.
+set -e
+
+make -f /usr/share/cta-@CTA_VERSION@/unittest/parallelTestsMakefile -j 4
+

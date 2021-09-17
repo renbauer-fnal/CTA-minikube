@@ -1,0 +1,30 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use LC::File qw(file_contents);
+
+my $subor='vysledky.txt';
+
+my $vysledky = file_contents($subor) if (-f $subor);
+
+my ($wrap, $track, $direction, $file, $block, $seek, $previousseek, $rewind) = (1, 1, 'forward', 0, 0, 0, 0, 0);
+foreach my $line (split ("\n", $vysledky)) {
+  # ### File: 1 Block: 20481 Seek time: 11.71 Rewind time: 14.55
+  if ($line =~ /^### File: (\d+) Block: (\d+) Seek time: (\d+.\d+) Rewind time: (\d+.\d+)$/oi) {
+    ($file, $block, $seek, $rewind) = ($1, $2, $3, $4);
+    if (($direction eq 'forward') and ($seek < $previousseek)) {
+      $direction = 'backwards';
+      $track++;
+    }
+    if (($direction eq 'backwards') and ($seek > $previousseek)) {
+      $direction = 'forward';
+      $track++;
+      $wrap++ if ($track % 2) == 1;
+    }
+    print "wrap: $wrap track: $track direction: $direction file: $file block: $block seek: $seek rewind: $rewind\n";
+    $previousseek = $seek;
+  } else {
+    print "Unexpected line: $line\n";
+  }
+}

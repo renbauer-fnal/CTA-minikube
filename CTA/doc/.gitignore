@@ -1,0 +1,14 @@
+*.aux
+*.bbl
+*.blg
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.ist
+*.log
+*.out
+*.toc
+*.swp
+latex/*.pdf
+castor/*.pdf

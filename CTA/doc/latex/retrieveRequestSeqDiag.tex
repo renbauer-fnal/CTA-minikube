@@ -1,0 +1,25 @@
+\begin{figure}[t]
+  \resizebox{\linewidth}{!}{
+    \begin{sequencediagram}
+      \newthread{c}{:Client}
+      \newinst[3]{ef}{:EOS FST}
+      \newinst[1]{em}{:EOS MGM}
+      \newinst[3]{cf}{:CTA FE}
+      \newinst[1]{ct}{:CTA TS}
+      \begin{call}{c}{prepare}{em}{ack}
+	     \begin{call}{em}{cta retrieve}{cf}{ack}\end{call}
+	     \begin{call}{em}{cta retrieve}{cf}{ack}\end{call}
+	     \begin{call}{em}{cta retrieve}{cf}{ack}\end{call}
+      \end{call}
+      \begin{call}{ct}{write file in tape session}{ct}{}
+	     \begin{call}{ct}{open}{em}{redirect}\end{call} \begin{messcall}{ct}{open}{ef}\end{messcall}
+	     \begin{messcall}{ct}{write}{ef}\end{messcall} \begin{messcall}{ct}{write}{ef}\end{messcall}
+	     \begin{messcall}{ct}{close}{ef}\end{messcall} \begin{call}{ct}{retrieve done (optional)}{em}{ack}
+	     \end{call}
+	   \end{call}
+      \begin{call}{c}{query}{em}{response}
+      \end{call}
+    \end{sequencediagram}
+  } \caption{File read from tape with the synchronous PREPARE workflow} \label{fig:explicit-retrieve}
+\end{figure}
+

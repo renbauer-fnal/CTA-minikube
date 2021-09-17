@@ -1,0 +1,167 @@
+.\" @project        The CERN Tape Archive (CTA)
+.\" @copyright      Copyright(C) 2021 CERN
+.\" @license        This program is free software: you can redistribute it and/or modify
+.\"                 it under the terms of the GNU General Public License as published by
+.\"                 the Free Software Foundation, either version 3 of the License, or
+.\"                 (at your option) any later version.
+.\"
+.\"                 This program is distributed in the hope that it will be useful,
+.\"                 but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"                 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"                 GNU General Public License for more details.
+.\"
+.\"                 You should have received a copy of the GNU General Public License
+.\"                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+.TH CTA-TAPED "1cta" "$Date: 2021/03/11 14:44:00 $" CTA "CTA"
+.SH NAME
+cta-taped \- Tape server daemon
+.SH SYNOPSIS
+.BI "cta-taped [OPTIONS]"
+
+.SH DESCRIPTION
+\fBcta-taped\fP is the daemon responsible for controlling one or more tape
+drives.
+.P
+When \fBcta-taped\fP is executed it immediately forks with the parent
+terminating and the child running in the background.  If required the
+\fB\-f, \-\-foreground\fP option can be used to stop \fBcta-taped\fP from
+forking and keep the parent process in the foreground.
+
+.SH TAPE LIBRARY SUPPORT
+
+CTA supports two types of tape libraries, SCSI compatible ones and Oracle
+Automatic Cartridge System (ACS) ones.  The cta-taped daemon requires a tape
+library daemon to be installed and run on the same tape server as itself.
+There are two types of CTA tape library daemons, one for SCSI compatible tape
+libraries and one for ACS tape libraries.
+
+A SCSI compatible tape library requires the following daemon:
+
+\fBrmcd\fP
+
+The installation RPM for the \fBrmcd\fP daemon and its manual page is:
+
+\fBcta-rmcd-MAJORVERSION-MINORVERSION.el7.cern.x86_64.rpm\fP
+
+The \fBcta-rmcd\fP daemon can be started, stopped and its status queried using
+the usual service commands:
+
+\fBservice cta-rmcd start\fP
+.br
+\fBservice cta-rmcd status\fP
+.br
+\fBservice cta-rmcd stop\fP
+
+.SH OPTIONS
+.TP
+\fB\-f, \-\-foreground
+Remain in the foreground.
+.TP
+\fB\-h, \-\-help
+Prints the usage message.
+.TP
+\fB\-c, \-\-config <config-file>
+Set the location of the CTA configuration file (cta.conf).  The default location is /etc/cta/cta.conf.
+
+.SH CTA CONFIGURATION PARAMETERS
+The cta-taped daemon reads and uses the following CTA configuration
+parameters which are specified within the CTA configuration file (the
+default location is /etc/cta/cta.conf).
+
+.TP
+\fBRMC HOST
+The host on which the rmcd daemon is running.
+
+.TP
+\fBRMC MAXRQSTATTEMPTS
+Maximum number of attempts a retriable RMC request should be issued.
+
+.TP
+\fBtaped BlkMoveTimeout
+The maximum time in seconds the data-transfer session of tapeserverd can
+cease to move data blocks
+
+.TP
+\fBtaped BufSize
+Size of a memory buffer in the data-transfer cache in bytes (default is 5
+Mebibytes).
+
+.TP
+\fBtaped BulkRequestMigrationMaxBytes
+When the tapeserverd daemon requests the tapegatewayd daemon for a set of
+files to migrate to tape, this parameter defines the maximum number of bytes
+the set of files should represent.
+
+.TP
+\fBtaped BulkRequestMigrationMaxFiles
+When the tapeserverd daemon requests the tapegatewayd daemon for a set of
+files to migrate to tape, this parameter defines the maximum number of files
+the set may contain.
+
+.TP
+\fBtaped BulkRequestRecallMaxBytes
+When the tapeserverd daemon requests the tapegatewayd daemon for a set of
+files to recall from tape, this parameter defines the maximum number of bytes
+the set of files should represent.
+
+.TP
+\fBtaped BulkRequestRecallMaxFiles
+When the tapeserverd daemon requests the tapegatewayd daemon for a set of
+files to recall from tape, this parameter defines the maximum number of files
+the set may contain.
+
+.TP
+\fBtaped MaxBytesBeforeFlush
+The value of this parameter defines the maximum number of bytes to be written
+to tape before a flush to tape (synchronised tape-mark).  Please note that a
+flush occurs on a file boundary therefore more bytes will normally be written
+to tape before the actual flush occurs.
+
+.TP
+\fBtaped MaxFilesBeforeFlush
+The value of this parameter defines the maximum number of files to be written
+to tape before a flush to tape (synchronised or non-immediate tape-mark).
+
+.TP
+\fBtaped MountTimeout
+The maximum time in seconds that the data-transfer session can take to mount a
+tape.
+
+.TP
+\fBtaped NbBufs
+Number of memory buffers in the data-transfer cache.
+
+.TP
+\fBtaped NbDiskThreads
+The number of disk I/O threads.
+
+.TP
+\fBtaped RemoteFileProtocol
+The protocol to be used when transferring files to and from disk servers.
+Possible values are RFIO or XROOT.  The value is not case sensitive.
+
+.TP
+\fBtaped externalEncryptionKeyScript
+The Python script to interface with the encryption data store.
+
+.TP
+\fBXROOT PrivateKey
+The file hosting the Xroot private key, needed to sign Xroot URLs.
+
+.SH FILES
+.TP
+.B /etc/cta/TPCONFIG
+The tape drive configuration file.
+.TP
+.B /etc/cta/cta.conf
+The CTA configuration file.
+.TP
+.B /var/log/cta/cta-tapeserverd.log
+The tape tapeserver log file.
+
+.SH TRADEMARKS
+Oracle is a registered trademark of Oracle Corporation and/or its affiliates.
+
+.SH AUTHOR
+\fBCTA\fP Team
