@@ -1,0 +1,49 @@
+# @project        The CERN Tape Archive (CTA)
+# @copyright      Copyright(C) 2015-2021 CERN
+# @license        This program is free software: you can redistribute it and/or modify
+#                 it under the terms of the GNU General Public License as published by
+#                 the Free Software Foundation, either version 3 of the License, or
+#                 (at your option) any later version.
+#
+#                 This program is distributed in the hope that it will be useful,
+#                 but WITHOUT ANY WARRANTY; without even the implied warranty of
+#                 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#                 GNU General Public License for more details.
+#
+#                 You should have received a copy of the GNU General Public License
+#                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+################################################################################
+#
+# CTA Sample Configuration File
+#
+################################################################################
+
+# The log mask.  Logs with a level lower than this value will be masked.
+# Possible values are:
+#   EMERG
+#   ALERT
+#   CRIT
+#   ERR
+#   WARNING
+#   NOTICE
+#   INFO
+#   DEBUG
+#   USERERR
+# Please note that the USERERR log level is equivalent to NOTICE because it is a convention of CTA to use log level NOTICE to label user errors.
+# taped LogMask INFO
+#
+# Define how many memory buffers should the CTA tape daemon use (compile time buffer size value is 5 MB) on a particular node (depends on physical memory).
+# taped BufferCount 5000
+#
+# Use Recommended Access Ordering if available.
+# taped UseRAO yes
+#
+# These options allow to trigger a software RAO algorithm on LTO tape drives.
+# taped RAOLTOAlgorithm sltf
+# taped RAOLTOAlgorithmOptions cost_heuristic_name:cta
+#
+# Disable Repack management.
+# taped DisableRepackManagement yes
+#
+# Disable Maintenance process.
+# taped DisableMaintenanceProcess yes

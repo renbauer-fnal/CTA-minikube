@@ -1,0 +1,213 @@
+/*
+ * @project        The CERN Tape Archive (CTA)
+ * @copyright      Copyright(C) 2015-2021 CERN
+ * @license        This program is free software: you can redistribute it and/or modify
+ *                 it under the terms of the GNU General Public License as published by
+ *                 the Free Software Foundation, either version 3 of the License, or
+ *                 (at your option) any later version.
+ *
+ *                 This program is distributed in the hope that it will be useful,
+ *                 but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *                 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *                 GNU General Public License for more details.
+ *
+ *                 You should have received a copy of the GNU General Public License
+ *                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "common/log/Logger.hpp"
+#include "common/log/LogLevel.hpp"
+#include "common/utils/utils.hpp"
+#include "common/exception/Exception.hpp"
+#include "PriorityMaps.hpp"
+#include <sys/time.h>
+#include <sys/syscall.h>
+
+namespace cta {
+namespace log {
+
+//------------------------------------------------------------------------------
+// constructor
+//------------------------------------------------------------------------------
+Logger::Logger(const std::string &hostName, const std::string &programName, const int logMask):
+  m_hostName(hostName), m_programName(programName), m_logMask(logMask),
+  m_priorityToText(generatePriorityToTextMap()) {}
+
+//------------------------------------------------------------------------------
+// getProgramName
+//------------------------------------------------------------------------------
+const std::string &Logger::getProgramName() const {
+  return m_programName;
+}
+
+//------------------------------------------------------------------------------
+// destructor
+//------------------------------------------------------------------------------
+Logger::~Logger() {
+}
+
+//-----------------------------------------------------------------------------
+// operator() 
+//-----------------------------------------------------------------------------
+void Logger::operator() (
+  const int priority,
+  const std::string &msg,
+  const std::list<Param> &params) {
+
+  const std::string rawParams;
+  struct timeval timeStamp;
+  gettimeofday(&timeStamp, NULL);
+  const int pid = getpid();
+
+  // Ignore messages whose priority is not of interest
+  if(priority > m_logMask) {
+    return;
+  }
+
+  // Try to find the textual representation of the syslog priority
+  std::map<int, std::string>::const_iterator priorityTextPair =
+    m_priorityToText.find(priority);
+
+  // Do nothing if the log priority is not valid
+  if(m_priorityToText.end() == priorityTextPair) {
+    return;
+  }
+
+  // Safe to get a reference to the textual representation of the priority
+  const std::string &priorityText = priorityTextPair->second;
+
+  const std::string header = createMsgHeader(timeStamp, m_hostName, m_programName, pid);
+  const std::string body = createMsgBody(priority, priorityText, msg, params, rawParams, m_programName, pid);
+
+  writeMsgToUnderlyingLoggingSystem(header, body);
+}
+
+//-----------------------------------------------------------------------------
+// cleanString
+//-----------------------------------------------------------------------------
+std::string Logger::cleanString(const std::string &s,
+  const bool replaceUnderscores) {
+  // Trim both left and right white-space
+  std::string result = utils::trimString(s);
+  
+  for (std::string::iterator it = result.begin(); it != result.end(); ++it) {
+
+    // Replace double quote with single quote
+    if ('"' == *it) {
+      *it = '\'';
+    }
+    
+    // Replace newline and tab with a space
+    if ('\t' == *it || '\n' == *it) {
+      *it = ' ';
+    }
+
+    // If requested, replace spaces with underscores
+    if(replaceUnderscores && ' ' == *it) {
+      *it = '_';
+    }
+  }
+
+  return result;
+}
+
+//------------------------------------------------------------------------------
+// generatePriorityToTextMap
+//------------------------------------------------------------------------------
+std::map<int, std::string>
+  Logger::generatePriorityToTextMap() {
+  return PriorityMaps::c_priorityToTextMap;
+}
+
+//------------------------------------------------------------------------------
+// generateConfigTextToPriorityMap
+//------------------------------------------------------------------------------
+std::map<std::string, int>
+  Logger::generateConfigTextToPriorityMap() {
+  return PriorityMaps::c_configTextToPriorityMap;
+}
+
+//------------------------------------------------------------------------------
+// setLogMask
+//------------------------------------------------------------------------------
+void Logger::setLogMask(const std::string logMask) {
+  try {
+    setLogMask(toLogLevel(logMask));
+  } catch(exception::Exception &ex) {
+    throw exception::Exception(std::string("Failed to set log mask: ") + ex.getMessage().str());
+  }
+}
+
+//------------------------------------------------------------------------------
+// setLogMask
+//------------------------------------------------------------------------------
+void Logger::setLogMask(const int logMask) {
+  m_logMask = logMask;
+}
+
+//-----------------------------------------------------------------------------
+// createMsgHeader
+//-----------------------------------------------------------------------------
+std::string Logger::createMsgHeader(
+  const struct timeval &timeStamp,
+  const std::string &hostName,
+  const std::string &programName,
+  const int pid) {
+  std::ostringstream os;
+  char buf[80];
+  int bufLen = sizeof(buf);
+  int len = 0;
+
+  struct tm localTime;
+  localtime_r(&(timeStamp.tv_sec), &localTime);
+  len += strftime(buf, bufLen, "%b %e %T", &localTime);
+  len += snprintf(buf + len, bufLen - len, ".%06ld ",
+    (unsigned long)timeStamp.tv_usec);
+  buf[sizeof(buf) - 1] = '\0';
+  os << buf << hostName << " " << programName << ": ";
+  return os.str();
+}
+
+//-----------------------------------------------------------------------------
+// createMsgBody
+//-----------------------------------------------------------------------------
+std::string Logger::createMsgBody(
+  const int priority,
+  const std::string &priorityText,
+  const std::string &msg,
+  const std::list<Param> &params,
+  const std::string &rawParams,
+  const std::string &programName,
+  const int pid) {
+  std::ostringstream os;
+
+  const int tid = syscall(__NR_gettid);
+
+  // Append the log level, the thread id and the message text
+  os << "LVL=\"" << priorityText << "\" PID=\"" << pid << "\" TID=\"" << tid << "\" MSG=\"" <<
+    msg << "\" ";
+
+  // Process parameters
+  for(auto itor = params.cbegin(); itor != params.cend(); itor++) {
+    const Param &param = *itor;
+
+    // Check the parameter name, if it's an empty string set the value to
+    // "Undefined".
+    const std::string name = param.getName() == "" ? "Undefined" :
+      cleanString(param.getName(), true);
+
+    // Process the parameter value
+    const std::string value = cleanString(param.getValue(), false);
+
+    // Write the name and value to the buffer
+    os << name << "=\"" << value << "\" ";
+  }
+
+  // Append raw parameters
+  os << rawParams;
+
+  return os.str();
+}
+
+} // namespace log
+} // namespace cta

@@ -1,0 +1,91 @@
+/*
+ * @project        The CERN Tape Archive (CTA)
+ * @copyright      Copyright(C) 2015-2021 CERN
+ * @license        This program is free software: you can redistribute it and/or modify
+ *                 it under the terms of the GNU General Public License as published by
+ *                 the Free Software Foundation, either version 3 of the License, or
+ *                 (at your option) any later version.
+ *
+ *                 This program is distributed in the hope that it will be useful,
+ *                 but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *                 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *                 GNU General Public License for more details.
+ *
+ *                 You should have received a copy of the GNU General Public License
+ *                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "common/exception/Exception.hpp"
+#include "common/processCap/SmartCap.hpp"
+
+//------------------------------------------------------------------------------
+// constructor
+//------------------------------------------------------------------------------
+cta::server::SmartCap::SmartCap() throw():
+  m_cap(NULL) {
+}
+
+//------------------------------------------------------------------------------
+// constructor
+//------------------------------------------------------------------------------
+cta::server::SmartCap::SmartCap(cap_t cap) throw():
+  m_cap(cap) {
+}
+
+//------------------------------------------------------------------------------
+// reset
+//------------------------------------------------------------------------------
+void cta::server::SmartCap::reset(cap_t cap) throw() {
+  // If the new capability state is not the one already owned
+  if(cap != m_cap) {
+
+    // If this smart pointer still owns a capability state then free it using
+    // cap_free()
+    if(NULL != m_cap) {
+      cap_free(m_cap);
+    }
+
+    // Take ownership of the new capability state
+    m_cap = cap;
+  }
+}
+
+//------------------------------------------------------------------------------
+// operator=
+//------------------------------------------------------------------------------
+cta::server::SmartCap &cta::server::SmartCap::operator=(SmartCap& obj) {
+  reset(obj.release());
+  return *this;
+}
+
+//------------------------------------------------------------------------------
+// destructor
+//------------------------------------------------------------------------------
+cta::server::SmartCap::~SmartCap() throw() {
+  reset();
+}
+
+//------------------------------------------------------------------------------
+// get
+//------------------------------------------------------------------------------
+cap_t cta::server::SmartCap::get() const throw() {
+  return m_cap;
+}
+
+//------------------------------------------------------------------------------
+// release
+//------------------------------------------------------------------------------
+cap_t cta::server::SmartCap::release() {
+  // If this smart pointer does not own a capbility state
+  if(NULL == m_cap) {
+    cta::exception::Exception ex;
+    ex.getMessage() << "Smart pointer does not own a capbility state";
+    throw(ex);
+  }
+
+  // Assigning NULL to m_cap indicates this smart pointer does not own a
+  // capability state
+  cap_t tmpCap = m_cap;
+  m_cap = NULL;
+  return tmpCap;
+}

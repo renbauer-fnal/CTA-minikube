@@ -1,0 +1,698 @@
+# Avoid problem with official Oracle RPMS not listing necessary capabilities
+%global __requires_exclude ^libocci.so|^libclntsh.so
+
+# Generic macros
+#---------------
+%define name cta
+%define ctaVersion @CTA_VERSION@
+%define ctaRelease @CTA_RELEASE@
+
+# Neutral packaging (for srpm)
+#-----------------------------
+%if 0%{?neutralpackage:1} > 0
+%define mydist %{nil}
+%else
+%define mydist %{?dist}
+%endif
+
+# Skipping unit tests (for developers)
+#-------------------------------------
+%define skip_unit_tests @SKIP_UNIT_TESTS@
+
+# Utility for reloading systemctl when needed
+#--------------------------------------------
+%define systemdDaemonReload() if [ -e /usr/bin/systemctl ] ; then /usr/bin/systemctl daemon-reload; fi
+%define systemdTryRestart() if [ -e /usr/bin/systemctl ] ; then /usr/bin/systemctl try-restart %1; fi
+
+# General settings
+#-----------------
+Summary: CERN Tape Archive
+Name: %{name}
+Version: %{ctaVersion}
+Release: %{ctaRelease}%{mydist}
+Source: %{name}-%{ctaVersion}-%{ctaRelease}.tar.gz
+License: GPLv3+
+Group: Application/cta
+
+BuildRoot: %{_builddir}/%{name}-%{version}-root
+BuildRequires: cmake >= 2.6 redhat-rpm-config
+
+
+# The CTA client is the only component of CTA that can be compiled on both SLC6
+# and C77, therefore only the packages it depends on are required for SLC6
+%define radosVersion 2:14.2.20
+%define xrootdVersion 1:4.12.4-1
+BuildRequires: xrootd-client-devel  >= %{xrootdVersion}
+BuildRequires: xrootd-devel         >= %{xrootdVersion}
+BuildRequires: xrootd-server-devel  >= %{xrootdVersion}
+BuildRequires: xrootd-private-devel >= %{xrootdVersion}
+BuildRequires: librados-devel = %{radosVersion}, libradosstriper-devel = %{radosVersion}, 
+BuildRequires: protobuf3-compiler >= 3.3.1 protobuf3-devel >= 3.3.1
+BuildRequires: gmock-devel >= 1.5.0 gtest-devel >= 1.5.0
+BuildRequires: sqlite-devel >= 3.6
+BuildRequires: libcap-devel >= 2.16
+BuildRequires: binutils-devel >= 2.20
+BuildRequires: openssl-devel >= 1.0.1e
+BuildRequires: cryptopp-devel >= 5.6.2
+BuildRequires: libuuid-devel >= 2.17
+BuildRequires: json-c-devel >= 0.11
+BuildRequires: libattr-devel >= 2.4.44
+BuildRequires: oracle-instantclient19.3-devel
+BuildRequires: mariadb-devel
+BuildRequires: postgresql-devel
+BuildRequires: valgrind
+BuildRequires: valgrind-devel
+BuildRequires: grpc, grpc-devel, grpc-static, grpc-plugins
+%{?systemd_requires}
+BuildRequires: systemd
+# only build debug info if you're building the whole code
+
+%description
+The CTA project is the CERN Tape Archive system.
+
+%prep
+%setup -q -n %{name}-%{ctaVersion}-%{ctaRelease}
+
+%build
+
+mkdir -p build
+cd build
+# The cmake step does the selection between client/server compilation or just client
+CTA_VERSION=%{ctaVersion} cmake .. -DCOMPILE_PACKAGING:STRING=0 -DVCS_VERSION=%{ctaRelease}
+# Workaround for the inability of cmake to handle properly the dependencies to generated code.
+%{__make} -s %{_smp_mflags} -k || true
+%{__make} -s %{_smp_mflags}
+
+%install
+%{__rm} -rf ${RPM_BUILD_ROOT}
+
+cd build
+%{__make} install DESTDIR=${RPM_BUILD_ROOT} EXPORTMAN=${RPM_BUILD_ROOT}/usr/share/man
+
+%clean
+%{__rm} -rf $RPM_BUILD_ROOT
+%{__rm} -rf $RPM_BUILD_DIR/%{name}-%{version}
+
+
+%check
+# The CTA client is the only component of CTA that can be compiled on both SLC6
+# and C77, therefore thereis no unittest for it
+%if "%{?dist}" == ".slc6" || "%{?dist}" == ".el6"
+%define skip_unit_tests 1
+%endif
+
+%if "%{skip_unit_tests}" == "0"
+cd build
+%{__make} shortunittests
+%endif
+
+# The main packages will be cta-taped, cta-frontend, cta-cli
+
+%package -n cta-taped
+Summary: CERN Tape Archive: tape daemon
+Group: Application/CTA
+Requires: logrotate
+Requires: cta-common = %{version}-%{release}
+Requires: cta-lib = %{version}-%{release}
+Requires: cta-lib-catalogue = %{version}-%{release}
+Requires: eos-client
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-taped
+CERN Tape Archive:
+The tape server daemon
+%files -n cta-taped
+%defattr(-,root,root)
+%attr(0644,root,root) %config(noreplace) /etc/logrotate.d/cta-taped
+%attr(0755,root,root) %{_bindir}/cta-taped
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-taped.conf.example
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/TPCONFIG.example
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-taped.1cta.gz
+%attr(0644,root,root) %config(noreplace) /etc/sysconfig/cta-taped
+%attr(0644,root,root) %config(noreplace) /etc/systemd/system/cta-taped.service
+
+%post -n cta-taped
+%systemd_post cta-taped.service
+%systemdDaemonReload
+%systemdTryRestart cta-taped.service
+
+%preun -n cta-taped
+%systemd_preun cta-taped.service
+
+%postun -n cta-taped
+%systemd_postun cta-taped.service
+%systemdDaemonReload
+
+%package -n cta-frontend
+Summary: CERN Tape Archive: Xrootd plugin
+Group: Application/CTA
+Requires: logrotate
+Requires: cta-common = %{version}-%{release}
+Requires: cta-lib = %{version}-%{release}
+Requires: cta-lib-catalogue = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+Requires: xrootd-server >= %{xrootdVersion}
+%description -n cta-frontend
+CERN Tape Archive:
+The xroot plugin
+%files -n cta-frontend
+%defattr(0755,root,root)
+%{_libdir}/libXrdSsiCta.so*
+%attr(0644,root,root) %config(noreplace) /etc/logrotate.d/cta-frontend
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-frontend-xrootd.conf
+%attr(0644,root,root) %config(noreplace) /etc/sysconfig/cta-frontend
+%attr(0644,cta,tape) /etc/systemd/system/cta-frontend.service
+
+#Frontend installs libraries so we need ldconfig.
+%post -n cta-frontend
+/sbin/ldconfig
+%systemd_post cta-frontend.service
+%systemdDaemonReload
+%systemdTryRestart cta-frontend.service
+
+%preun -n cta-frontend
+%systemd_preun cta-frontend.service
+
+%postun -n cta-frontend
+/sbin/ldconfig
+%systemd_post cta-frontend.service
+%systemdDaemonReload
+
+%package -n cta-cli
+Summary: CERN Tape Archive: command line interface
+Group: Application/CTA
+Requires: cta-lib-common = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-cli
+CERN Tape Archive:
+The command line utilities
+%files -n cta-cli
+%defattr(-,root,root)
+%attr(0755,root,root) %{_bindir}/cta-admin
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-admin.1cta.gz
+%attr(0755,root,root) %{_bindir}/cta-send-event
+%attr(0755,root,root) %{_bindir}/cta-send-closew.sh
+%attr(0755,root,root) %{_bindir}/cta-verify-file
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-cli.conf
+
+%package -n cta-lib-common
+Summary: CERN Tape Archive libraries
+Group: Application/CTA
+# Explicity require protobuf3 to avoid clash with eos-protobuf3
+Requires: protobuf3
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-lib-common
+CERN Tape Archive:
+The shared libraries base
+%files -n cta-lib-common
+%defattr(0755,root,root,-)
+%{_libdir}/libctacommon.so*
+
+%package -n cta-lib-catalogue
+Summary: CERN Tape Archive libraries
+Group: Application/CTA
+# Explicity require protobuf3 to avoid clash with eos-protobuf3
+Requires: cta-lib-common
+Requires: mariadb-libs
+Requires: oracle-instantclient19.3-basic
+Requires: postgresql-libs
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-lib-catalogue
+CERN Tape Archive:
+Shared libraries required to access the CTA catalogue
+%files -n cta-lib-catalogue
+%defattr(0755,root,root,-)
+%{_libdir}/libctacatalogue.so*
+%{_libdir}/libctardbms.so*
+%{_libdir}/libctardbmswrapper.so*
+%{_libdir}/libctaschemachecker.so*
+%{_libdir}/libctastatistics.so*
+
+%package -n cta-lib
+Summary: CERN Tape Archive libraries
+Group: Application/CTA
+Requires: librados2 = %{radosVersion}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+# Explicity require protobuf3 to avoid clash with eos-protobuf3
+Requires: protobuf3
+Requires: cta-lib-common = %{version}-%{release}
+%description -n cta-lib
+CERN Tape Archive:
+The shared libraries
+%files -n cta-lib
+%defattr(0755,root,root,-)
+#TODO: merge util and common
+%{_libdir}/libctascheduler.so*
+%{_libdir}/libctaobjectstore.so*
+%{_libdir}/libctamediachanger.so*
+%{_libdir}/libctamessages.so*
+%{_libdir}/libctamessagesutils.so*
+%{_libdir}/libctarao.so*
+%{_libdir}/libctadisk.so*
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-catalogue.conf.example
+
+#CTA-lib installs libraries so we need ldconfig.
+%post -n cta-lib -p /sbin/ldconfig
+%postun -n cta-lib -p /sbin/ldconfig
+
+%package -n cta-systemtests
+Summary: CERN Tape Archive: unit and system tests with virtual tape drives
+Group: Application/CTA
+Requires: valgrind >= 3.8.1
+Requires: cta-lib = %{version}-%{release}
+Requires: cta-taped = %{ctaVersion}-%{ctaRelease}%{mydist}
+Requires: make
+Requires: moreutils
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-systemtests
+CERN Tape Archive:
+Unit tests and system tests with virtual tape drives
+%files -n cta-systemtests
+%defattr(0755,root,root,-)
+%{_libdir}/libsystemTestHelperTests.so*
+%{_libdir}/libcta-tapedSystemTests.so*
+%{_bindir}/cta-rdbmsUnitTests
+%{_bindir}/cta-rdbmsUnitTests-oracle.sh
+%{_bindir}/cta-unitTests
+%{_bindir}/cta-unitTests-multiProcess
+%{_bindir}/cta-valgrindUnitTests.sh
+%{_bindir}/cta-unitPlusSystemTests.sh
+%{_libdir}/libctacataloguecmdlineunittests.so*
+%{_libdir}/libctacommonunittests.so*
+%{_libdir}/libctadbconfigcatalogueunittests.so*
+%{_libdir}/libctadbconfigconnunittests.so*
+%{_libdir}/libctadbconfigstmtunittests.so*
+%{_libdir}/libctaexceptionunittests.so*
+%{_libdir}/libctainmemorycatalogueunittests.so*
+%{_libdir}/libctainmemoryconnunittests.so*
+%{_libdir}/libctainmemorystmtunittests.so*
+%{_libdir}/libctaobjectstoreunittests.so*
+%{_libdir}/libctardbmsunittests.so*
+%{_libdir}/libctardbmswrapperunittests.so*
+%{_libdir}/libctaschedulerunittests.so*
+%{_libdir}/libctatapeserverdaemonunittests.so*
+%{_libdir}/libctatapeserverdriveunittests.so*
+%{_libdir}/libctatapeserverfileunittests.so*
+%{_libdir}/libctatapeserverscsiunittests.so*
+%{_libdir}/libctadaemonunittests.so*
+%{_libdir}/libctamediachangerunittests.so*
+%{_libdir}/libctadiskunittests.so*
+%{_libdir}/libctatapelabelunittests.so*
+%{_libdir}/libctatapeserverraounittests.so*
+%{_bindir}/cta-systemTests
+%{_libdir}/libctadaemonunittests-multiprocess.so*
+%attr(0644,root,root) %{_datadir}/%{name}-%{ctaVersion}/unittest/*.suppr
+%attr(0644,root,root) %{_datadir}/%{name}-%{ctaVersion}/unittest/parallelTestsMakefile
+
+%package -n cta-immutable-file-test
+Summary: CERN Tape Archive: command-line tool for testing immutable files
+Group: Application/CTA
+Requires: cta-lib-common = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-immutable-file-test
+CERN Tape Archive:
+Command-line tool for testing immutable files
+%files -n cta-immutable-file-test
+%defattr(0755,root,root,-)
+%{_bindir}/cta-immutable-file-test
+
+%package -n cta-objectstore-tools
+Summary: CERN Tape Archive: object store tools
+Group: Application/CTA
+Requires: cta-lib = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-objectstore-tools
+CERN Tape Archive:
+Tools allowing initialization and inspection of the object store.
+%files -n cta-objectstore-tools
+%attr(0755,root,root) %{_bindir}/cta-objectstore-initialize
+%attr(0755,root,root) %{_bindir}/cta-objectstore-list
+%attr(0755,root,root) %{_bindir}/cta-objectstore-dump-object
+%attr(0755,root,root) %{_bindir}/cta-objectstore-dereference-removed-queues
+%attr(0755,root,root) %{_bindir}/cta-objectstore-collect-orphaned-object
+%attr(0755,root,root) %{_bindir}/cta-objectstore-create-missing-repack-index
+
+#cta-systemtests installs libraries so we need ldconfig.
+%post -n cta-systemtests -p /sbin/ldconfig
+%postun -n cta-systemtests -p /sbin/ldconfig
+
+%package -n cta-catalogueutils
+Summary: Utilities to faciliate working with the CTA catalogue
+Group: Application/CTA
+Requires: cta-lib-catalogue = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-catalogueutils
+CERN Tape Archive:
+Scripts and utilities to faciliate working with the CTA catalogue
+%files -n cta-catalogueutils
+%attr(0755,root,root) %{_bindir}/cta-catalogue-admin-user-create
+%attr(0755,root,root) %{_bindir}/cta-catalogue-schema-create
+%attr(0755,root,root) %{_bindir}/cta-catalogue-schema-drop
+%attr(0755,root,root) %{_bindir}/cta-catalogue-set-production
+%attr(0755,root,root) %{_bindir}/cta-catalogue-schema-verify
+%attr(0755,root,root) %{_bindir}/cta-database-poll
+%attr(0755,root,root) %{_bindir}/cta-statistics-save
+%attr(0755,root,root) %{_bindir}/cta-statistics-update
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-catalogue-admin-user-create.1cta.gz
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-catalogue-schema-create.1cta.gz
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-catalogue-schema-drop.1cta.gz
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-catalogue-set-production.1cta.gz
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-catalogue-schema-verify.1cta.gz
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-database-poll.1cta.gz
+
+%package -n cta-migration-tools
+Summary: Tools for migrating CASTOR to CTA
+Group: Application/CTA
+Requires: cta-lib-catalogue = %{version}-%{release}
+Requires: cx_Oracle >= 7.1
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-migration-tools
+CERN Tape Archive:
+Tools for migrating the CASTOR catalogue to CTA and injecting CASTOR file and
+directory metadata into the EOS namespace.
+%files -n cta-migration-tools
+%attr(0755,root,root) %{_bindir}/eos-import-dirs
+%attr(0755,root,root) %{_bindir}/eos-import-files
+%attr(0755,root,root) %{_bindir}/eos-test-dir-inject
+%attr(0755,root,root) %{_bindir}/eos-test-file-inject
+%attr(0755,root,root) %{_bindir}/json-pretty-print.sh
+%attr(0644,root,root) %{_bindir}/begin_vo_export_to_cta.sh
+%attr(0644,root,root) %{_bindir}/export_production_tapepool_to_cta.sh
+%attr(0755,root,root) %{_bindir}/tapepool_castor_to_cta.py
+%attr(0755,root,root) %{_bindir}/zerolen_castor_to_cta.py
+%attr(0755,root,root) %{_bindir}/complete_cta_export.py
+%attr(0644,root,root) %{_bindir}/vmgr_reenable_tapepool.sh
+%attr(0644,root,root) %{_bindir}/cta-catalogue-remove-castor-tapes.py
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/castor-migration.conf.example
+
+%package -n cta-rmcd
+Summary: The Remote Media Changer daemon (rmcd)
+Group: Application/CTA
+Requires: logrotate
+Requires: cta-common = %{version}-%{release}
+%description -n cta-rmcd
+CERN Tape Archive:
+The Remote Media Changer daemon (rmcd)
+%files -n cta-rmcd
+%defattr(-,root,root)
+%attr(0644,root,root) %config(noreplace) /etc/logrotate.d/cta-rmcd
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-rmcd.1cta.gz
+%attr(0755,root,root) %{_bindir}/cta-rmcd
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-rmcd.conf
+%attr(0644,root,root) %config(noreplace) /etc/sysconfig/cta-rmcd
+%attr(0644,root,root) /etc/systemd/system/cta-rmcd.service
+
+%post -n cta-rmcd
+%systemd_post cta-rmcd.service
+%systemdDaemonReload
+%systemdTryRestart cta-rmcd.service
+
+%preun -n cta-rmcd
+%systemd_preun cta-rmcd.service
+
+%postun -n cta-rmcd
+%systemd_postun cta-rmcd.service
+%systemdDaemonReload
+
+%package -n cta-smc
+Summary: The client of the Remote Media Changer Daemon (rmcd)
+Group: Application/CTA
+%description -n cta-smc
+CERN Tape Archive:
+The client of the Remote Media Changer Daemon (rmcd)
+%files -n cta-smc
+%defattr(-,root,root)
+%attr(0755,root,root) %{_bindir}/cta-smc
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-smc.conf
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-smc.1cta.gz
+
+%package -n cta-tape-label
+Summary: The command-line tool for pre-labelling a CTA tape.
+Group: Application/CTA
+Requires: cta-lib = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+Requires(post): /usr/sbin/setcap
+%description -n cta-tape-label
+CERN Tape Archive:
+The command-line tool for pre-labelling a CTA tape.
+%files -n cta-tape-label
+%defattr(-,root,root)
+%attr(0750,cta,tape) %{_bindir}/cta-tape-label
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-tape-label.1cta.gz
+%post -n cta-tape-label
+/usr/sbin/setcap cap_sys_rawio+ep  %{_bindir}/cta-tape-label
+
+%package -n cta-readtp
+Summary: The command-line tool for reading files from a CTA tape.
+Group: Application/CTA
+Requires: cta-lib = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+Requires(post): /usr/sbin/setcap
+%description -n cta-readtp
+CERN Tape Archive:
+The command-line tool for reading files from a CTA tape.
+%files -n cta-readtp
+%defattr(-,root,root)
+%attr(0750,cta,tape) %{_bindir}/cta-readtp
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-readtp.1cta.gz
+%post -n cta-readtp
+/usr/sbin/setcap cap_sys_rawio+ep  %{_bindir}/cta-readtp
+
+%package -n cta-common
+Summary: CERN Tape Archive common items
+Group: Application/CTA
+Requires(pre): /usr/bin/egrep, /usr/sbin/groupadd, /usr/sbin/luseradd
+%description -n cta-common
+CERN Tape Archive:
+Common items such as the creation of the cta local user and /var/log/cta
+%pre -n cta-common
+/usr/bin/egrep -q '^cta:' /etc/passwd || /usr/sbin/luseradd -s /bin/nologin -c "CTA system account" -g tape cta
+%files -n cta-common
+%defattr(-,root,root)
+%attr(0755,cta,tape) %dir /var/log/cta
+
+%package -n cta-fst-gcd
+Summary: Tape aware garbage collector daemon to run on an EOS FST
+Group: Application/CTA
+Requires: eos-client
+Requires: python
+%description -n cta-fst-gcd
+cta-fst-gcd is a daemon that runs on an EOS FST and garbage
+collects EOS disk copies that have been safely stored to tape.
+%files -n cta-fst-gcd
+%defattr(-,root,root)
+%attr(0755,root,root) %{_bindir}/cta-fst-gcd
+%attr(0644,root,root) %doc /usr/share/man/man1/cta-fst-gcd.1cta.gz
+%attr(0644,root,root) %config(noreplace) /etc/systemd/system/cta-fst-gcd.service
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/cta/cta-fst-gcd.conf.example
+%post -n cta-fst-gcd
+%systemd_post cta-fst-gcd.service
+%systemdDaemonReload
+%systemdTryRestart cta-fst-gcd.service
+
+%preun -n cta-fst-gcd
+%systemd_preun cta-fst-gcd.service
+
+%postun -n cta-fst-gcd
+%systemd_postun cta-fst-gcd.service
+%systemdDaemonReload
+
+%package -n cta-systemtest-helpers
+Summary: Collection of utilities deployed in system test client containers.
+Group: Application/CTA
+Requires: cta-lib = %{version}-%{release}
+Requires: xrootd-client-libs >= %{xrootdVersion}
+%description -n cta-systemtest-helpers
+Collection of utilities deployed in system test client containers.
+Currently contains a helper for the client-ar script, which should be installed alongside it.
+%files -n cta-systemtest-helpers
+%attr(0755,root,root) /usr/bin/cta-client-ar-abortPrepare
+
+%package -n cta-release
+Summary: Repository configuration for CTA dependencies
+Group: Application/CTA
+Requires: yum-plugin-versionlock
+%description -n cta-release
+Repository configuration for CTA dependencies
+This package contains .repo files, gpg keys and yum-versionlock configuration for CTA
+%files -n cta-release
+%defattr(-,root,root)
+%attr(0644,root,root) %config(noreplace) %{_sysconfdir}/yum.repos.d/*
+%attr(0644,root,root) %{_sysconfdir}/pki/rpm-gpg/*
+%attr(0644,root,root) %{_sysconfdir}/yum/pluginconf.d/versionlock.cta
+%attr(0755,root,root) %{_bindir}/cta-versionlock
+
+%post -n cta-release
+/usr/bin/cta-versionlock apply
+
+%preun -n cta-release
+/usr/bin/cta-versionlock clear
+
+
+%changelog
+* Wed Aug 18 2021 volodymyr.yurchenko (at) cern.ch - 4.1-1
+- cta/CTA#1016 New options for filtering deleted files using `cta-admin rtf ls` command.
+- cta/CTA#983 Add cta-release package for public binary rpm distribution.
+- cta/CTA#980 Add external encryption script option
+- [frontend] New command "tapefile rm" allows deleting a copy of a file from tape
+- cta/CTA#1014 Fix last column alignment when more than 1000 items are listed.
+* Tue Jul 27 2021 julien.leduc (at) cern.ch - 4.0-5
+- [frontend] Add options to "tapepool ls" to filter tapepools on their name, vo and encryption
+- cta/CTA#898 cta-send-event now gets the requester id and eos instance as command line arguments
+- cta/CTA#1005 "tape ls" now can filter tapes on wether they were imported from CASTOR
+- cta/CTA#1006 "repack ls" now shows the tapepool of the tape being repacked
+- [frontend] Adds missing break after "schedulinginfo ls" command
+- cta/CTA#999 Adds a default mount rule
+- cta/CTA#1003 The expansion of a repack request now fails if the archive route for archiving the repacked files is missing
+* Fri Jul 09 2021 julien.leduc (at) cern.ch - 4.0-4
+- cta/CTA#1002 Do not requeue report jobs when reportType is NoReportRequired
+* Mon Jul 05 2021 julien.leduc (at) cern.ch - 4.0-3
+- Upgraded ceph to version 14.2.20
+- Adds cta-verify-file to cta-cli RPM
+* Tue Jun 01 2021 julien.leduc (at) cern.ch - 4.0-2
+- Upgraded EOS to 4.8.45
+- Upgraded eos-xrootd to 4.12.8
+- cta/CTA#966 Unable to distinguish empty and wrong tape pool
+- cta/CTA#926 Improve MigrationReportPacker::ReportSkipped::execute() exception message
+- cta/CTA#584 Validate checksum when recalling from tape
+* Fri Feb 05 2021 julien.leduc (at) cern.ch - 4.0-1
+- cta/CTA#964 Adds failure log messages to processCLOSEW in CTA Frontend
+- When the operator submits a tape to repack, a check is done about the tape state before queueing the repack request to ensure it can be repacked
+- Oracle catalogue migration scripts 3.1to3.2.sql: replaced DELETE FROM table_name by TRUNCATE TABLE table_name
+* Wed Feb 03 2021 julien.leduc (at) cern.ch - 3.2-1
+- Upgraded EOS to 4.8.37-1
+- cta/CTA#922 The superseded concept has been removed and replaced by a new recycle bin
+- cta/CTA#943 A new tape lifecycle logic has been implemented
+- cta/CTA#948 The max drives allowed for reading and writing are now set per virtual organization and not per mount policy anymore
+- cta/CTA#952 Reclaiming a tape resets the IS_FROM_CASTOR flag to 0
+- cta/CTA#951 The query used by RdbmsCatalogueTapeContentsItor has been put back to the state it was in v3.1-13
+- cta/CTA#883 Tape verification tool
+* Thu Jan 07 2021 julien.leduc (at) cern.ch - 3.1-14
+- Upgraded EOS to 4.8.35-1
+- cta/CTA#954 The drive is put down if the CleanerSession fails to eject the tape from it after a shutdown
+- cta/CTA#945 The timeout for tape load action is now configurable
+- cta/CTA#957 The state of the successful Archive for repack jobs is now changed before being queued for reporting
+- cta/CTA#958 The RepackRequest garbage collection now changes the owner of the garbage collected RepackRequest.
+* Thu Jan 07 2021 julien.leduc (at) cern.ch - 3.1-13
+- Upgraded EOS to 4.8.34-1
+- Upgraded xrootd to 4.12.6-1
+- cta/CTA#941 Slow `cta-admin sq` even when there is very little activity
+- cta/CTA#951 Improve the performance of RdbmsCatalogueTapeContentsItor
+- cta/CTA#939 cta-objectstore-dereference-removed-queue removes all kind of manually deleted queues from the RootEntry
+* Fri Dec 04 2020 julien.leduc (at) cern.ch - 3.1-12
+- Upgraded EOS to 4.8.30-1
+* Wed Dec 02 2020 julien.leduc (at) cern.ch - 3.1-11
+- cta/CTA#932 Add environment file for cta-frontend service: frontend configured to use 10 XRootD polling threads by default
+- cta/CTA#292 Allow non interactive usages of cta-admin with sss authentication
+- Upgraded EOS to 4.8.29-1
+- cta/operations#155 Fix for conversion issues
+- cta/operations#154 Improve sys.retrieve.req_id to allow to cancel retrieves on a running instance: adding epoch timestamp in ids
+- EOS-4505 Separate archive and retrieve ACLs in EOS: only needs p ACL for prepare
+- cta/operations#150 high priority Archive job not scheduled when Repack is running: fixed
+* Thu Nov 12 2020 julien.leduc (at) cern.ch - 3.1-10
+- cta/CTA#837 Repack now fails if the repack buffer VID directory cannot be created during expansion
+- cta/CTA#920 Archive and Retrieve error report URL correction on the cta-send-event cmdline tool
+- cta/CTA#923 Corrected the cta-admin showqueues command to display all the retrieve queues of tapes that are on the same tapepool
+- Unuseful WARNING logs are now DEBUG logs
+* Wed Nov 04 2020 julien.leduc (at) cern.ch - 3.1-9
+- Upstream EOS 4.8.26-1
+- cta/CTA#907 For backpressure, the EOS free space can be fetched by calling an external script
+- cta/CTA#917 Corrected the bug in the cta-admin showqueues command in the case ArchiveForUser and ArchiveForRepack exist for the same tapepool
+- cta/CTA#919 Archive queue oldestjobcreationtime is now updated at each pop from the ArchiveQueue
+* Fri Oct 22 2020 julien.leduc (at) cern.ch - 3.1-8
+- CTA software Recommended Access Order (RAO) implemented for LTO drives
+- cta-admin repack ls tabular output improvements
+- Upstream EOS 4.8.24-1
+- Upstream xrootd to 4.12.5-1
+- Repack management execution can be disabled via the cta-taped configuration file
+- cta/CTA#907 Maintenance process can be disabled via the cta-taped configuration file
+- Catalogue refactoring
+- utils::trimString() now returns an empty string if the string passed in parameter contains only white-space characters
+- cta/CTA#895 [catalogue] RdbmsCatalogue::deleteLogicalLibrary does not delete empty logical library
+- Repack request and sub-requests are now unowned from their Agent when completed
+* Wed Sep 23 2020 julien.leduc (at) cern.ch - 3.1-7
+- cta/CTA#893 Corrected slowliness of RdbmsCatalogue::getArchiveFileToRetrieveByArchiveFileId()
+* Mon Sep 21 2020 julien.leduc (at) cern.ch - 3.1-6
+- cta/CTA#881 cta-fst-gcd logs can be now sent to stdout by command line option for container based deployments
+- cta/CTA#885 cta-admin should be able to query by sys.archive.file_id
+- Upstream eos 4.8.15-1
+- Upstream xrootd 4.12.4-1
+- cta/CTA#890 CTA RPMs should only use the xrootd-client-libs package
+- buildtree installation scripts are made compatible with Centos 7
+- cta/CTA#892 Modified the log level of the triggering of Archive and Retrieve mounts
+- cta/CTA#889 It is not possible to retrieve a file that is not active anymore
+- cta/CTA#877 ObjectStore.RetrieveQueueAlgorithms unit tests fails or succeeds base on version of cmake
+- cta/CTA#888 Garbage collector race condition
+- cta/CTA#891 Corrected Repack Archive subrequest creation time
+* Thu Aug 20 2020 julien.leduc (at) cern.ch - 3.1-5
+- cta/CTA#863 Prevent SQLite database files from being used as the CTA catalogue database backend
+- cta/CTA#861 cta-admin comment column is flush left
+- cta/CTA#862 Unable to delete tabtest tape pool because it is in an archive route
+- cta/CTA#860 Correct contents of cta-lib-catalogue RPM and correct dependencies on it
+- Reinstates "cta-admin failedrequest --summary" option
+- cta/CTA#865 Empty the RetrieveQueue in the case of cancellation of a retrieve request when the drive is down
+* Fri Aug 7 2020 steven.murray (at) cern.ch - 3.1-4
+- cta/CTA#858 Remove dependency between the cta-migration-tools RPM and librados2
+- cta/CTA#857 Remove unnecessary LEFT OUTER JOIN clauses from the CTA catalogue
+- cta/CTA#852 Fixing sqlite CI use case
+- cta/CTA#850 [repack] If the --no-recall flag is passed to the repack request submission the --disabled-flag test should not be done.
+- cta/CTA#846 cta-admin tapefile ls: list by fileid
+- cta/CTA#840 Remove cta-objectstore-unfollow-agent from cta-objectstore-tools
+* Fri Jul 31 2020 julien.leduc (at) cern.ch - 3.1-3
+- Upstream eos 4.8.10-1
+- Added --no-recall option to cta-admin repack command
+- Catalogue connection pool improvements
+* Fri Jul 17 2020 steven.murray (at) cern.ch - 3.1-2
+- Added database upgrade/changelog script oracle/3.0to3.1.sql
+* Thu Jul 16 2020 julien.leduc (at) cern.ch - 3.1-1
+- Corrected bugs on cta-objectstore-create-missing-repack-index tool
+- Corrected a bug that caused crash of all tapeservers while scheduling
+- Catalogue schema version 3.1 : addition of a new index on the TAPE table
+- Catalogue and Unit tests improvements
+* Wed Jun 24 2020 julien.leduc (at) cern.ch - 3.0-3
+- The cta-statistics-update tool updates tape statistics one by one
+* Wed Jun 24 2020 julien.leduc (at) cern.ch - 3.0-2
+- Upstream eos 4.8.3-1
+- Upstream xrootd 4.12.3-1
+- Mount policies are now dynamically updated on queued Archive and Retrieve requests
+- cta-admin sq now display queued retrieves on disabled tapes
+* Thu Jun 18 2020 julien.leduc (at) cern.ch - 3.0-1
+- eos 4.8.2-1
+- xrootd 4.12.1-1
+- Catalogue 3.0
+- Tape media-type management
+- File recycle-bin for file deletion
+- cta-admin modifications
+- cta-send-event allowing to manually retry to Archive or Retrieve a file
+- prevent eos /proc/conversion worfklows from deleting files from CTA
+- Repack submission will fail if no mount policy is given
+- bug fixes
+* Mon May 4 2020 julien.leduc (at) cern.ch - 2.0-5
+- Upstream eos 4.7.12-1
+- Added support for FileID change in EOS that occurs during conversion
+* Wed Apr 15 2020 julien.leduc (at) cern.ch - 2.0-3
+- eos 4.7.9-1
+- Adding reason and comment to cta drive (better track usage and issues)
+* Wed Apr 08 2020 julien.leduc (at) cern.ch - 2.0-2
+- eos 4.7.8-1
+- xrootd 4.11.3-1
+- ceph nautilus 14.2.8-0
+- fix for xrdfs query prepare on_tape logic
+- more tests on the tape drive (device path must exist, no name duplication in objectstore)
+* Sat Mar 14 2020 julien.leduc (at) cern.ch - 2.0-1
+- Schema version 2.0: DISK_FILE_PATH is now resolved on eos instance using grpc and VIRTUAL_ORGANIZATION has its own table 
+- eos 4.6.7-1
+- xrootd 4.11.2-1
+* Fri Feb 21 2020 julien.leduc (at) cern.ch - 1.2-0
+- Upgrade the catalogue schema from version 1.0 to 1.1 before updating CTA components.
+- Added cta-admin tapefile ls command
+- Scheduler does not schedule a mount if a tape is disabled (unless for a Repack with the --disabledtape flag set)
+- Added a new schema verification tool (cta-catalogue-schema-verify)
+- Added a new tape statistic updater tool (cta-statistics-update)
+- Added backward-compatible Catalogue schema changes
+- CASTOR-To-CTA migration improvements
+- Various changes and improvements to cta-admin tool
+- CTA Frontend has configurable maximum file size limit (cta.archivefile.max_size_gb), default 2TB
+- CTA Frontend logs which FST sent the archive request
+- New configuration file for gRPC namespace endpoints so CTA can query EOS namespace
+- Archive requests sent to hard-coded fail_on_closew_test storage class will always fail with an error
+

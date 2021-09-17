@@ -1,0 +1,12 @@
+HEPiX Autumn/Fall 2018 Workshop
+11 Oct 2018, 16:10 (25m)
+
+LTO experiences at CERN
+German Cancio Melia (CERN)
+https://indico.cern.ch/event/730908/contributions/3153156/
+
+CERN has purchased LTO-8 tape drives that we have started to use with LTO-8 and LTO-7 type M media.
+While LTO is attractive in terms of cost/TB, it lacks functionality for fast positioning available on
+enterprise drives, such as a high-resolution tape directory and drive-assisted file access ordering
+(aka RAO). In this contribution, we will outline our experiences with LTO so far, describe performance
+measurements and our current investigations on how to improve positioning times.

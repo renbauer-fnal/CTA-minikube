@@ -1,0 +1,758 @@
+---
+title: 'LTO positioning times: Analysis and multiple linear regression model, v1.5'
+author: "German Cancio <german.cancio@cern.ch>"
+output:
+  html_document: default
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+ 
+   
+#
+# TODO:
+# - add recommendations for future research: Landing zones modeling, improved algorithms
+# - circulate!
+  
+---
+
+
+```{r eval=TRUE, results='hide', message=FALSE, echo=FALSE}
+# Prepare libraries et al
+rm(list=ls())
+library(data.table)
+library(plyr)
+library(dtplyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(Metrics)
+
+all <- read.table("/Users/gcancio/Documents/CERNBox/WORK/ST/tape service/LTO\ performance/positioning-info/position-x-y-L7-full-12092018v2.txt", header=TRUE); 
+all <- data.table(all)
+all$X. <- NULL
+
+# color scales
+# Usage: ggplot (...) + scale_colour_manual(values = cols_yesno)
+#cols_band <- c("0" = "red", "1" = "blue", "2" = "darkgreen", "3" = "orange")
+#cols_yesno <- c("1" = "red", "0" = "blue")
+
+```
+ 
+
+The data analysed below comes from $LTO-8$ (using $LTO-7M$ media) tape read mounts at CERN since July 2018 ($> 1.8M$ file positionings from over 8000 tape mounts using 140 full L7 tapes). Via the "computing-position-cost" script, data is extracted from tapeserverd logs, integrated with each tape's positioning information and sanitised. For each individual file positioning, a vector containing relevant information is constructed, including: 
+
+* tape server, VID
+* from/to segment fseq
+* from/to wrap and longitudinal position
+* wrap, band, direction change (yes/no)
+* stepback in motion sense (yes/no)
+* measured time taken for the positioning
+* tapeserverd file transaction and volume request ID's
+
+Contiguous "no-op" repositionings in the motion sense (i.e. from $fseq_{i-1} -  fseq_{i}$ as found in full tape verification) are discarded. Around `r floor(length(all$FROM_LPOS)/1000)` K file positionings are finally retained for the analysis.
+
+Distance (as absolute difference between LPOS units) and the estimated positioning time with the initial model coefficients are computed within this notebook and added as well.
+
+The data is then used for the definition and adjusting of predictor parameters using a multi linear regression using the above-mentioned parameters in order to resolve optimal coefficients $\alpha_{0}-\alpha_{5}$ for $postime_{i} = \alpha_{0} + \alpha_{1} WRAPCHANGE + \alpha_{2} BANDCHANGE + \alpha_{3} DIRCHANGE + \alpha_{4} STEPBACK + \alpha_{5} DISTANCE$
+
+A first tabular and visual look at the data follows below. As seen in the first histogram, distances between positionings are not evenly distributed, with a clear dominance of short ones, as most of the recorded positionings were done using mounts of 10-500 segments and using optimisation algorithms to minimise positioning cost and thus distances between segments. 
+
+Note that this doesn't represent an unwanted bias to the data - positioning over long distances is clearly dominated by the longitudinal traversal time, and we are rather interested in optimising coefficients for smaller distances. The remaining histograms show that all tape regions (LPOS, wrap) are roughly evenly represented in the sample, with the following exceptions: The BOT area is over-represented as all positionings start there. The last wraps are under-represented as they are rarely written completely.
+
+```{r eval=TRUE}
+
+
+# tape length in meters
+LTO7_8_TAPE_LENGTH <- 960
+
+# max LPOS
+MAXLPOS <- 171144
+
+# max time measured during wrap testing to position from beginning to end of wrap
+
+MAXPOSTIME <- 105
+
+# distance between source and destination longitudinal position
+all$distance <- abs(all$TO_LPOS-all$FROM_LPOS)
+
+# longitudinal positioning speed in m/s
+all$speed <- all$distance/all$TIME / MAXLPOS * LTO7_8_TAPE_LENGTH
+
+# direction: 0 from beginning to end, 1 from end to beginning
+
+all$from_direction <- all$FROM_WRAP %% 2
+all$to_direction <- all$TO_WRAP %% 2
+
+# are we staying in the same half of the tape or crossing mid-tape?
+#
+all$HALF_CHANGE <- ifelse((all$FROM_LPOS < (MAXLPOS /2)*0.98 & all$TO_LPOS > (MAXLPOS / 2)*1.02) |
+                             (all$FROM_LPOS > (MAXLPOS /2)*1.02 & all$TO_LPOS < (MAXLPOS / 2)*0.98),1,0)
+
+## sanitisation
+
+# a) clean out severe drive/session-related outliers due to media/drive error recovery e.g. above MAXPOSTIME + 15s margin of positioning time
+
+all <- all[TIME < (MAXPOSTIME + 15)]
+
+# b) clean out unrealistic position speed movements (faster than max rewind speed which is < 10m/s) that are likely caused by caching / read ahead effects
+
+all <- all[speed < 10]
+
+
+# cost function coefficients, as initially estimated
+
+# repositioning base overhead (s)
+po <- 4
+# wrap change overhead (s)
+to <- 5
+# band change overhead (s) [on top of wrap change]
+bo <- 3
+# motion/direction change overhead (s)
+mo <- 2
+# stepback overhead (s)
+so <- 4
+# distance factor (seconds per LPOS units)
+df <- MAXPOSTIME/MAXLPOS
+
+# band (0-3)
+
+all$FROM_BAND <- trunc(all$FROM_WRAP / (168/4))
+all$TO_BAND <- trunc(all$TO_WRAP / (168/4))
+
+# cost estimator function
+all$TIME_EST <- po + to*all$WRAPCHANGE + bo*all$BANDCHANGE + 
+  mo*all$DIRCHANGE + so*all$STEPBACK + df*all$distance
+
+all$DIFF_TIME_EST <- all$TIME-all$TIME_EST
+
+# longitudinal positioning speed in m/s
+all$SPEED_EST <- all$distance/all$TIME_EST / MAXLPOS * LTO7_8_TAPE_LENGTH
+
+
+# summary table
+
+summ <- all[, .(MEAN_TIME=mean(TIME),MEAN_TIME_EST=mean(TIME_EST),MEAN_DIST=mean(distance),MEAN_DIST_METERS=mean(distance/MAXLPOS*LTO7_8_TAPE_LENGTH),SUM_TIME=sum(TIME),SUM_TIME_EST=sum(TIME_EST),SUM_DIST=sum(distance),SUM_DIST_METERS=sum(distance/MAXLPOS*LTO7_8_TAPE_LENGTH),SUM_FILES=length(distance),VID=head(VID,1),HOST=head(HOST,1)),by = .(VOLREQID)]
+
+
+# how many wraps per tape identified
+maxwrap <- all[,.(MAXWRAP=max(FROM_WRAP,TO_WRAP)),by = .(VID)]
+
+
+length(all$FROM_LPOS)
+
+summary(all)
+summary(summ)
+
+hist(all$distance/MAXLPOS*100,100,main= "Histogram of traversed distance", xlab = "tape length traversed (%)", ylab = "occurences")
+
+hist(all$TIME,100)
+
+hist(all$FROM_WRAP,168/2)
+hist(all$TO_WRAP,168/2)
+hist(all$FROM_LPOS,100)
+
+hist(all$TO_LPOS,100)
+
+
+# show all x-y TO values, just to show that the complete x/y area has been covered. 
+# Takes horrible time to generate and not really that useful, thus commented out
+#
+# ggplot(all,aes(x=TO_LPOS,y=TO_WRAP)) + geom_point(alpha=0.01,aes(color=TIME)) +  scale_color_gradient(low="blue", high="red")
+
+```
+
+
+## Check further for unusual tape servers and VIDs
+
+See box plots below - tpsrv105 is noticeably less performant than the others, but is not removed from the analysis.
+
+```{r message=FALSE, echo=FALSE}
+ggplot(all,aes(x=HOST,y=TIME)) + stat_boxplot(
+                         geom = "errorbar")  +geom_boxplot(outlier.size=1) +theme(
+                  axis.text.x = element_text(angle = 90, hjust = 1),
+                  axis.text.y = element_text(size=3))
+
+ggplot(all,aes(x=VID,y=TIME)) + stat_boxplot(
+                         geom = "errorbar")  +geom_boxplot(outlier.size=1) +theme(
+                  axis.text.x = element_text(angle = 90, hjust = 1),
+                  axis.text.y = element_text(size=3))
+
+# could delete all positionings from tpsrv105, but little impact.
+#all <- all[HOST!="tpsrv105"]
+#summ <- summ[HOST!="tpsrv105"]
+```
+
+
+
+##X-Y plot for time based on LPOS
+
+$x: from LPOS, y: to LPOS$. (First plot: time, second plot: speed) The diagonal dark area/line is where distance (and thus position time) is minimal. The impact of mid-tape that divides the tape in two areas can be clearly recognised.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+ggplot(all, aes(x=FROM_LPOS, y=TO_LPOS)) + geom_point(shape=3,aes(color=TIME)) +ggtitle(
+                          "Positioning time from/to LPOS") + scale_color_gradient(low="blue", high="red")
+
+ggplot(all, aes(x=FROM_LPOS, y=TO_LPOS)) + geom_point(shape=3,aes(color=speed)) +ggtitle(
+    "Positioning speed from/to LPOS") + scale_color_gradient(low="blue", high="red")
+```
+
+## Specific example
+
+A specific example on how the data can be used: show all positionig times in $LPOS[39K,40K]$ to $LPOS[88K,89K]$ involving band change and no direction change
+
+
+```{r eval=TRUE}
+ggplot(all[BANDCHANGE == 1 & DIRCHANGE == 0 & 
+             FROM_LPOS > 39000 & FROM_LPOS < 40000 & 
+             TO_LPOS > 88000 & TO_LPOS < 89000], 
+       aes(x=FROM_LPOS, y=TO_LPOS)) + 
+  geom_point(shape=3,aes(color=TIME)) +ggtitle(
+                "Positioning time from/to LPOS") + scale_color_gradient(low="blue", high="red")
+
+```
+
+## Changes across wraps
+
+the plot below shows timings for all measured wrap changes that are co-directional (no direction change), no step-back, within an $LPOS$ distance below $1000$ and positioning time below $50s$. The 4 squares appearing around the diagonal indicate the four bands of the tape - changing wrap within a band is faster than across bands.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+ggplot(all[distance<1000 & TIME < 50 & DIRCHANGE == 0 & STEPBACK == 0], 
+        aes(x=FROM_WRAP, y=TO_WRAP)) + 
+     geom_point(shape=3,aes(color=TIME)) +ggtitle(
+                "Positioning time from/to wrap") + scale_color_gradient(low="blue", high="red")
+```
+
+This is consistent with the band changes as defined in the model, visualized below (band change and estimated time):
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+ggplot(all[distance<1000 & TIME < 50], 
+        aes(x=FROM_WRAP, y=TO_WRAP)) + 
+      geom_point(shape=3, aes(color=BANDCHANGE)) + scale_color_gradient(low="blue", high="red")
+
+ggplot(all[distance<1000 & TIME < 50], 
+        aes(x=FROM_WRAP, y=TO_WRAP)) + 
+      geom_point(shape=3,aes(color=TIME_EST)) +ggtitle(
+                "Estimated positioning time from/to wrap") + scale_color_gradient(low="blue", high="red")
+
+
+```
+
+
+
+
+## X-Y plot for estimated time based on LPOS
+
+Using original estimate coefficients.
+
+$x: from LPOS, y: to LPOS$
+
+(The mid-tape landing area was not part of the original estimator modeling and does thus not visually appear here)
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+ggplot(all, aes(x=FROM_LPOS, y=TO_LPOS)) + geom_point(shape=3,aes(color=TIME_EST)) +ggtitle(
+                          "Estimated positioning time from/to LPOS") + scale_color_gradient(low="blue", high="red")
+
+hist(all$TIME_EST,100)
+
+```
+
+##Measured positioning time as a function of the traversed distance
+
+X-axis: distance traversed, Y-axis: time, color: band change
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(all, aes(x=distance, y=TIME)) + geom_point(shape=3,aes(color=BANDCHANGE)) +ggtitle(
+                          "Positioning time as a function of distance") + geom_smooth()  + scale_color_gradient(low="blue", high="red")
+
+
+```
+
+There is a significant spread above the diagonal. This is likely caused by positioning requiring a direction change that imply winding to the nearest key point (landing area), stopping, changing direction and searching for the block at a slower speed. 
+
+The following plot shows the positionings from beginning of the tape without band change, but implying a direction change to a reverse wrap. The lines orthogonal to the diagonal are a consequence of the distance to the next landing area:
+
+```{r}
+ggplot(all[
+               FROM_LPOS < 3000 & STEPBACK == 0 & from_direction == 0 & to_direction ==1 & BANDCHANGE == 0], 
+       aes(x=TO_LPOS, y=TIME)) + 
+    geom_point(shape=3,aes(color=speed)) +scale_color_gradient(low="blue", high="red") + ggtitle(
+        "Positioning time from ~BOT and forth wrap to reverse wrap, no band change")
+
+
+
+```
+
+## Positioning speed in m/s
+
+The first plot shows a histogram of all positioning speeds. The peak at 5.25m/s corresponds to the time the drive is actually searching at read speed within a landing zone and the same wrap. This is even better seen on the second histogram, showing all positionings within the same wrap without stepback. The third histogram shows all positionings across co-directional wraps without stepback - the peak has disappeared.
+
+The next plot shows the speed over distance for all positionings within the same wrap, no stepbacks. The maximum positioning speed as well as the above-mentioned peak can be clearly seen.
+
+
+
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+hist(all$speed ,100, main= "positioning speed histogram (m/s)", xlab = "speed (m/s)", ylab = "observations")
+
+hist(all[STEPBACK ==0 & WRAPCHANGE ==0]$speed ,100, main= "positioning speed histogram (m/s), same wrap, no stepback", xlab = "speed (m/s)", ylab = "observations")
+
+hist(all[STEPBACK ==0 & WRAPCHANGE ==0 & HALF_CHANGE ==0]$speed ,100, main= "positioning speed histogram (m/s), same wrap, no stepback, same longitudinal half", xlab = "speed (m/s)", ylab = "observations")
+
+hist(all[STEPBACK ==0 & WRAPCHANGE ==0 & HALF_CHANGE ==1]$speed ,100, main= "positioning speed histogram (m/s), same wrap, no stepback, change of longitudinal half", xlab = "speed (m/s)", ylab = "observations")
+
+hist(all[STEPBACK ==0 & HALF_CHANGE ==0]$speed ,100, main= "positioning speed histogram (m/s)\n no stepback, same longitudinal half", xlab = "speed (m/s)", ylab = "observations")
+
+hist(all[STEPBACK ==0 & HALF_CHANGE ==1]$speed ,100, main= "positioning speed histogram (m/s)\n no stepback, change of longitudinal half", xlab = "speed (m/s)", ylab = "observations")
+
+
+
+
+ggplot(all[STEPBACK ==0 & WRAPCHANGE ==0], aes(x=distance, y=speed)) + 
+  geom_point(shape=3,aes(color=FROM_LPOS),alpha=0.2) +ggtitle(
+     "speed(m/s) over distance (LPOS units), same wrap, no stepback") + 
+  scale_color_gradient(low="blue", high="red") + geom_smooth()
+
+ggplot(data=all[STEPBACK ==0 & WRAPCHANGE ==0 & distance < MAXLPOS / 10],aes(x=distance,y=speed)) + geom_point(shape=3,aes(color=FROM_LPOS),alpha=0.1) +ggtitle(
+     "speed(m/s) over distance (LPOS units), same wrap, no stepback, distance < 10% of tape") + 
+  scale_color_gradient(low="blue", high="red") + geom_smooth()
+
+# commented out:
+# The last plot shows the median speed over distance (again same wrap, no stepbacks)
+# ... not really interesting data - averages of the above
+#mean_by_distance <- all[WRAPCHANGE == 0 & STEPBACK == 0, .(MEAN_SPEED=mean(speed),MEAN_TIME=mean(TIME)),by = .(distance)]
+
+#ggplot(mean_by_distance,aes(x=distance,y=MEAN_SPEED)) + geom_point(shape=3,aes(color=MEAN_TIME),alpha=0.2) + geom_smooth()
+
+
+```
+
+
+
+
+##Estimated positioning time as a function of the traversed distance
+
+Using originally used parameters
+
+X-axis: distance traversed, Y-axis: estimated time, color: band change
+
+The model does not include distance to the next landing area, thus these are not visible in the plot below.
+
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(all, aes(x=distance, y=TIME_EST)) + geom_point(shape=3,aes(color=BANDCHANGE)) + geom_smooth() +ggtitle(
+                          "Estimated positioning time as a function of distance") + scale_color_gradient(low="blue", high="red")
+
+
+```
+
+##Difference between measured and estimated positioning time as a function of the traversed distance
+
+X-axis: distance traversed, Y-axis: estimated time, color: band change
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(all, aes(x=distance, y=DIFF_TIME_EST)) + geom_point(shape=3,aes(color=BANDCHANGE)) + geom_smooth() +ggtitle(
+                          "Difference in estimated vs real positioning time")
+
+
+hist(all$DIFF_TIME_EST,100)
+
+```
+
+## Build the multilinear regression model
+
+using the following 5 parameters as coefficients for the multilinear regression model, calculate coefficients for each of them:
+
+$TIME_{i} = \alpha_{0} + \alpha_{1} WRAPCHANGE + \alpha_{2} BANDCHANGE + \alpha_{3} HALF_CHANGE + \alpha_{4} DIRCHANGE + \alpha_{5} STEPBACK + \alpha_{6} distance$
+
+Being $\alpha_{0}$ the base overhead of incurring positioning changes. 
+
+Analyse robustness of estimators, examine in particular std. error, $p$-values for significance of coefficients (should be below $0.05$), $t$-values and $R^2$ (should be $ >0.7 $):
+
+
+```{r eval=TRUE}
+
+#ml <- lm(TIME ~ WRAPCHANGE + BANDCHANGE + 
+#           DIRCHANGE + STEPBACK + distance, data=all)
+
+
+ml <- lm(TIME ~ WRAPCHANGE + BANDCHANGE + HALF_CHANGE +
+           DIRCHANGE + STEPBACK + distance, data=all)
+
+ml
+summary(ml)
+```
+
+check confidence intervals:
+
+```{r eval=TRUE}
+
+confint(ml)
+
+```
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+# cost function as currently estimated
+
+# repositioning base overhead (s)
+po <- getElement(ml$coefficients,"(Intercept)")
+# wrap change overhead (s)
+to <- getElement(ml$coefficients,"WRAPCHANGE")
+# band change overhead (s)
+bo <- getElement(ml$coefficients,"BANDCHANGE")
+# change of mid-tape
+sh <- getElement(ml$coefficients,"HALF_CHANGE")
+# motion change overhead (s)
+mo <- getElement(ml$coefficients,"DIRCHANGE")
+# stepback overhead (s)
+so <- getElement(ml$coefficients,"STEPBACK")
+# distance factor
+df <- getElement(ml$coefficients,"distance")
+
+# update estimators
+
+all$TIME_EST <- po + to*all$WRAPCHANGE + bo*all$BANDCHANGE + sh*all$HALF_CHANGE + mo*all$DIRCHANGE + so*all$STEPBACK + df*all$distance
+all$SPEED_EST <- all$distance/all$TIME_EST / MAXLPOS * LTO7_8_TAPE_LENGTH
+
+all$DIFF_TIME_EST <- all$TIME-all$TIME_EST
+
+
+
+```
+
+Check MSE and RMSE: mean square error and root mean square error
+
+(RMSE already seen as part of MLR above: "Residual standard error")
+
+```{r}
+
+mse(all$TIME_EST,all$TIME)
+rmse(all$TIME_EST,all$TIME) # could also simply sqrt of previous
+
+```
+
+
+
+
+##Re-estimate positioning time as a function of the traversed distance using new coefficients:
+
+X-axis: distance traversed, Y-axis: estimated time, color: band change
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(all, aes(x=distance, y=TIME_EST)) + geom_point(shape=3,aes(color=BANDCHANGE)) + geom_smooth() +ggtitle(
+                          "Re-estimated positioning time as a function of distance")
+
+hist(all$TIME_EST,100)
+
+```
+
+## Difference between measured and re-estimated positioning time plot with adjusted LR coefficients 
+
+
+The histograms shows an overall and noticeable improvement in the estimate. 
+
+However, as the second plot shows, there is still a significant spread in particular for shorter repositionings, consequence of the missing modeling of local landing areas.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(all, aes(x=distance, y=DIFF_TIME_EST)) + geom_point(shape=3,aes(color=BANDCHANGE),alpha=0.1) + geom_smooth() +ggtitle(
+                          "Difference in estimated vs real positioning time, adjusted after LR") + scale_color_gradient(low="blue", high="red")
+
+hist(all$DIFF_TIME_EST,100, main= "Measured vs estimated positiong time\n adjusted after LR", xlab = "difference measured-expected (s)", ylab = "observations")
+
+all$distance_percent <- paste((floor(all$distance * 10 / MAXLPOS))*10,'%',sep='')
+
+
+
+ggplot(all[DIFF_TIME_EST > -50],aes(x=distance_percent,y=DIFF_TIME_EST)) + stat_boxplot(  # > -50: avoid strange outliers
+                           geom = "errorbar")  +geom_boxplot(outlier.size=1,outlier.alpha = 0.1) +theme(
+                    axis.text.x = element_text(angle = 90, hjust = 1),
+                    axis.text.y = element_text(size=12)) +ggtitle(
+                          "Difference in estimated vs measured postime, by distance") +
+                    xlab("tape length traversed") + ylab("Difference in expected vs measured time")
+
+
+
+
+
+#
+# what mean time is spent on what activity?
+#
+
+dist_breakdown_raw <- all[, .(stdev=sd(DIFF_TIME_EST),time=mean(TIME),
+                             overhead=po,wrap_change=mean(WRAPCHANGE)*to,band_change=mean(BANDCHANGE)*bo,half_change=mean(HALF_CHANGE)*sh,direction_change=mean(DIRCHANGE)*mo,stepback=mean(STEPBACK)*so,distance=mean(distance)*df), by = .(distance_percent)] 
+
+
+dist_breakdown_melt <- melt(dist_breakdown_raw,id.vars=c("distance_percent")) 
+
+ggplot(dist_breakdown_melt[variable != "stdev" & variable != "time"],aes(x=distance_percent,y=value,fill=variable)) +geom_bar( stat="identity") + 
+      ggtitle("Expected positioning time breakdown over distance") +
+      xlab("tape length traversed") + ylab("postime (s)") 
+
+ggplot(dist_breakdown_raw,aes(x=distance_percent,y=time)) +geom_bar(stat="identity",fill="light blue") + 
+      ggtitle("Measured vs expected positioning time\nbreakdown over distance") +
+      xlab("tape length traversed") + ylab("measured postime +/- sd(measured-expected)") + geom_errorbar(aes(ymin=time-stdev,ymax=time+stdev),alpha=0.5,width=0.5)
+
+  
+# ggplot(dist_breakdown_raw,aes(x=distance_percent)) + geom_errorbar(aes(ymin=-stdev,ymax=stdev))
+
+ggplot(all, aes(x=FROM_LPOS, y=TO_LPOS)) + geom_point(shape=3,aes(color=TIME_EST)) +ggtitle(
+                          "Estimated positioning time from/to LPOS") + scale_color_gradient(low="blue", high="red")
+
+ggplot(all, aes(x=FROM_LPOS, y=TO_LPOS)) + geom_point(shape=3,aes(color=SPEED_EST)) +ggtitle(
+                          "Estimated positioning speed from/to LPOS") + scale_color_gradient(low="blue", high="red")
+
+```
+
+## Impact of different scheduling algorithms 
+
+(all on tape L70050 - chosen at random - with the same list of segments being recalled)
+
+Note: Red segments mean: head positioning, black segments: tape reading
+
+RANDOM scheduling with LPOS on 200 files. Distance the head travelled: `r sum (all[VOLREQID == 40521798]$distance)` LPOS units. Time spent in positioning: `r sum (all[VOLREQID == 40521798]$TIME)` seconds.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+
+# some melting required to correctly show: from_lpos, to_lpos as full movement plots
+
+full_movements <- melt(all[VOLREQID %in% c(40521798,40507195,40581845,40595195,40602121)],measure.vars = c("FROM_LPOS","TO_LPOS"))[order(FTRANSID)]
+full_movements$OPTYPE <- ifelse (full_movements$variable == "FROM_LPOS",1,0)
+
+#full_movements$ID <- c(1:nrow(full_movements))
+#full_movements$POSID <- ((full_movements$ID -1) %% 2) + (full_movements$FTRANSID * 2)
+
+
+#ggplot(full_movements[
+#     VOLREQID == 40521798], 
+#     aes(x=POSID,y=value)) + aes (color=OPTYPE) + geom_line() +scale_color_gradient(low="black", high="red") +ggtitle(
+#         "LPOS head position using RANDOM, 200 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+
+ggplot(full_movements[
+     VOLREQID == 40521798], 
+     aes(x=1:nrow(full_movements[VOLREQID == 40521798]),y=value)) + geom_line(aes(color=OPTYPE)) + # + geom_line(aes(color=variable)) +
+     scale_color_gradient(low="black", high="red") +ggtitle(
+         "LPOS head position using RANDOM, 200 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+
+ggplot(all[
+     VOLREQID == 40521798], 
+     aes(x=FTRANSID, y=TIME)) + geom_line() +
+     geom_point(shape=3) +ggtitle(
+         "Positioning time using RANDOM, 200 files")
+
+hist(all[
+     VOLREQID == 40521798]$TIME,10)
+
+#ggplot(all[VOLREQID == 40521798], 
+#     aes(x=FTRANSID, y=cumsum(distance))) + geom_line() +ggtitle(
+#         "Distance traversed by head")
+
+```
+
+LINEAR with LPOS on 200 files. Distance the head travelled: `r sum (all[VOLREQID == 40507195]$distance)` LPOS units. Time spent in positioning: `r sum (all[VOLREQID == 40507195]$TIME)` seconds.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(full_movements[
+     VOLREQID == 40507195], 
+     aes(x=1:nrow(full_movements[VOLREQID == 40507195]),y=value)) + geom_line(aes(color=OPTYPE)) + # + geom_line(aes(color=variable)) +
+     scale_color_gradient(low="black", high="red") +ggtitle(
+         "LPOS head position using LINEAR, 200 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+
+
+ggplot(all[
+     VOLREQID == 40507195], 
+     aes(x=FTRANSID, y=TIME)) + geom_line() +
+     geom_point(shape=3) +ggtitle(
+         "Positioning time using LINEAR, 200 files")
+
+
+#ggplot(all[VOLREQID == 40507195], 
+#     aes(x=FTRANSID, y=cumsum(distance))) + geom_line() +ggtitle(
+#         "Distance traversed by head")
+
+hist(all[
+     VOLREQID == 40507195]$TIME,10)
+
+```
+
+SCAN with LPOS on 200 files. Distance the head travelled: `r sum (all[VOLREQID == 40581845]$distance)` LPOS units. Time spent in positioning: `r sum (all[VOLREQID == 40581845]$TIME)` seconds.
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(full_movements[
+     VOLREQID == 40581845], 
+     aes(x=1:nrow(full_movements[VOLREQID == 40581845]),y=value)) + geom_line(aes(color=OPTYPE)) + # + geom_line(aes(color=variable)) +
+     scale_color_gradient(low="black", high="red") +ggtitle(
+         "LPOS head position using SCAN, 200 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+
+# TO_LPOS
+#ggplot(all[
+#     VOLREQID == 40581845], 
+#     aes(x=FTRANSID, y=TO_LPOS)) + geom_line() +
+#     geom_point(shape=3) +ggtitle(
+#         "LPOS head position using SCAN, 200 files") + ylab("Longitudinal Head position ") + xlab("File retrieval")
+# FROM_LPOS
+#ggplot(all[
+#      VOLREQID == 40581845], 
+#      aes(x=FTRANSID, y=FROM_LPOS)) + geom_line() +
+#      geom_point(shape=3) +ggtitle(
+#          "LPOS head position using SCAN, 200 files") + ylab("Longitudinal Head position ") + xlab("File retrieval")
+
+ggplot(all[
+     VOLREQID == 40581845], 
+     aes(x=FTRANSID, y=TIME)) + geom_line() +
+     geom_point(shape=3) +ggtitle(
+         "Positioning time using SCAN, 200 files")
+
+hist(all[
+     VOLREQID == 40581845]$TIME,10)
+
+
+#ggplot(all[VOLREQID == 40581845], 
+#     aes(x=FTRANSID, y=cumsum(distance))) + geom_line() + +ggtitle(
+#         "Distance traversed by head")
+
+
+```
+
+SLTF with LPOS on 200 files. Distance the head travelled: `r sum (all[VOLREQID == 40595195]$distance)` LPOS units. Time spent in positioning: `r sum (all[VOLREQID == 40595195]$TIME)` seconds.
+
+Note that here and compared to LINEAR, the travelled distance is `r round(sum (all[VOLREQID == 40507195]$distance) / sum (all[VOLREQID == 40595195]$distance),1)` times shorter! This represents significant improvements (therefore savings) in terms of drive head and media wearout.
+
+The time spent positioning compared to LINEAR is `r round(sum (all[VOLREQID == 40507195]$TIME) / sum (all[VOLREQID == 40595195]$TIME),1)` times shorter.
+
+
+```{r eval=TRUE, message=FALSE, echo=FALSE}
+
+ggplot(full_movements[
+     VOLREQID == 40595195], 
+     aes(x=1:nrow(full_movements[VOLREQID == 40595195]),y=value)) + geom_line(aes(color=OPTYPE)) + # + geom_line(aes(color=variable)) +
+     scale_color_gradient(low="black", high="red") +ggtitle(
+         "LPOS head position using SLTF, 200 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+ggplot(all[
+     VOLREQID == 40595195], 
+     aes(x=FTRANSID, y=TIME)) + geom_line() +
+     geom_point(shape=3) +ggtitle(
+         "Positioning time using SLTF, 200 files")
+
+#ggplot(all[VOLREQID == 40595195], 
+#     aes(x=FTRANSID, y=cumsum(distance))) + geom_line() +ggtitle(
+#         "Distance traversed by head")
+
+hist(all[
+     VOLREQID == 40595195]$TIME,10)
+
+```
+
+## 500 segments recall example
+
+VID L70039. Distance the head travelled: `r sum (all[VOLREQID == 40602121]$distance)` LPOS units. Time spent in positioning: `r sum (all[VOLREQID == 40602121]$TIME)` seconds.
+
+
+```{r}
+
+ggplot(full_movements[
+     VOLREQID == 40602121], 
+     aes(x=1:nrow(full_movements[VOLREQID == 40602121]),y=value)) + geom_line(aes(color=OPTYPE)) + # + geom_line(aes(color=variable)) +
+     scale_color_gradient(low="black", high="red") +ggtitle(
+         "LPOS head position using SLTF, 500 files") + ylab("Longitudinal Head position ") + xlab("Head movement op")
+
+ggplot(all[
+     VOLREQID == 40602121], 
+     aes(x=FTRANSID, y=TIME)) + geom_line() +
+     geom_point(shape=3) +ggtitle(
+         "Positioning time using SLTF")
+
+hist(all[
+     VOLREQID == 40602121]$TIME,10)
+
+
+```
+
+## Evolution of mean time/distance and total time/distance for 200 file recalls
+
+```{r}
+
+# a bit meaningless if we don't specify exactly which range corresponds to what activity
+
+# VOLREQID
+# ranges for 200 files and LINEAR
+# [40507135,40509937]
+
+# ranges for 200 files and RANDOM
+# [40520037,40522801] 
+
+# ranges for 200 files and SCAN
+# [40582482,40583867]
+
+# ranges for 200 files and SLTFv4
+# [40595146,40596759]
+
+# ranges for 200 files and SLTFv5 (not used)
+# [40615583,40615956]
+
+##### FIXME: Add column specifying activity types - for the ranges above
+
+# mean distance (in meters) and mean time
+
+summ$VOLREQID_CG <- paste("_",floor(summ$VOLREQID / 10000),sep ="") # coarse-grained division matching the test series. FIXME: remove me :-)
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=MEAN_DIST_METERS)) + stat_boxplot(
+                          geom = "errorbar")   +ggtitle("Traversed distance / file, 200 files") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Distance in meters / file") +
+                scale_y_continuous(breaks=c(0,50,100,150,200,250,300,350)) +
+                scale_x_discrete(labels=c("_4050" = "LINEAR", "_4052" = "RANDOM", "_4058" = "SCAN", "_4059" = "SLTF"))
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=MEAN_TIME)) + stat_boxplot(
+                          geom = "errorbar")  +ggtitle("Position time per file, 200 files") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Postime (s) / file") + 
+                scale_y_continuous(breaks=c(0,5,10,15,20,25,30,35,40,45,50)) + 
+                  scale_x_discrete(labels=c("_4050" = "LINEAR", "_4052" = "RANDOM", "_4058" = "SCAN", "_4059" = "SLTF"))
+
+
+
+
+# total distance (in meters) and total time, per mount
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=SUM_DIST_METERS)) + stat_boxplot(
+                          geom = "errorbar")  + ggtitle ("Total positioning distance") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Total Distance in meters")
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=SUM_TIME)) + stat_boxplot(
+                          geom = "errorbar")   + ggtitle ("Total positioning time") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Total time (s)")
+
+
+# total distance (in meters) and total time, per mount, normalised to 200 files/recalls (some recalls were fewer)
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=MEAN_DIST_METERS*200)) + stat_boxplot(
+                          geom = "errorbar")  + ggtitle ("Total positioning time, 200 files") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Total Distance in meters")
+
+ggplot (summ[(VOLREQID %in% 40507135:40509937 | VOLREQID %in% 40520037:40522801 | VOLREQID %in% 40582482:40583867 | 
+               VOLREQID %in% 40595146:40596759 ) & SUM_FILES > 100 & SUM_FILES <= 200],aes(x=VOLREQID_CG,y=MEAN_TIME*200)) + stat_boxplot(
+                          geom = "errorbar")  + ggtitle ("Total positioning time, 200 files") +
+                geom_boxplot(outlier.shape = NA) + xlab("Positioning Algorithm") + ylab("Total time (s)")
+
+
+```
+
+
+

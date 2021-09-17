@@ -1,0 +1,339 @@
+From: Vladimir Bahyl <Vladimir.Bahyl@cern.ch>
+Subject: RE: LTO drive tests (aiming at RAO functionality)
+Date: 3 August 2018 at 17:15:25 CEST
+To: German Cancio Melia <German.Cancio.Melia@cern.ch>
+
+German,
+
+(colors used in this e-mail)
+
+Tape LTO-8 L80011 mounted in I1L80531@tpsrv119.
+
+Investigation after some random skips:
+
+1/ WRAP and LOGICAL POSITION:
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=3 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 05 00 02
+20     57 4a 66 00 00 00 00 66  81 00 70 4c 38 00 11 80
+30     38 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 07 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+Where:
+
+05h = wrap (according to manual, but we call this track or band) numbers start from 0 so this is offset by 1 from my data
+
+11h 80h 38h = 118038h = 1146936 logical block
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=1 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 05 00 00
+20     ef e2 66 00 00 00 00 66  81 00 70 4c 38 00 13 60
+30     3e 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 07 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+Where:
+
+05 = wrap (according to manual, but we call this track or band) numbers start from 0 so this is offset by 1 from my data
+
+13h 60h 3eh = 13603eh = 1269822 logical block
+
+ 
+2/ PHYSICAL POSITION:
+
+[root@tpsrv119 ~]# tapeinfo -f /dev/sg2|grep -i posi
+
+Block Position: 1269822
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=0 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 05 00 00
+20     ef e2 66 00 00 00 00 66  81 00 70 4c 38 00 13 60
+30     3e 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 01 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+Where:
+
+efh e2h = efe2h = 61410
+
+[root@tpsrv119 ~]# scsitape -f /dev/sg2 seek 1269823
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=1 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 05 00 00
+20     ef d0 66 00 00 00 00 66  81 00 70 4c 38 00 13 60
+30     3f 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 01 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+Where:
+
+efh d0h = efd0h = 61392
+
+= moving to the next logical block, physical relative position within the wrap decreased because that is backward direction
+
+Skipping to another (totally random) position:
+
+[root@tpsrv119 ~]# tapeinfo -f /dev/sg2|grep -i posi
+
+Block Position: 6062376
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=2 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 1a 00 02
+20     88 ab 66 00 00 00 00 66  81 00 70 4c 38 00 5c 81
+30     28 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 07 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+[root@tpsrv119 ~]# less /afs/cern.ch/project/castor/tape/tests/LTO/LTO-8/LTO-8-L80011-skip-rewind.txt
+
+-          This was to check the wrap number – above command reports 1ah = 26 which corresponds to my results (track 27 for block 6062376)
+-          This is a forward wrap
+
+[root@tpsrv119 ~]# scsitape -f /dev/sg2 seek 6062377
+
+-          Skip to the next logical block
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=1 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c 1a 00 02
+20     88 bd 66 00 00 00 00 66  81 00 70 4c 38 00 5c 81
+30     29 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 01 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+The RELATIVE LPOS VALUE increased (since forward wrap) from 02h 88h abh = 0288abh = 166059 to 02h 88h bdh = 0288bdh = 166077.
+
+
+3/ LAST FILE ON THE TAPE:
+
+[root@tpsrv119 ~]# tapeinfo -f /dev/sg2|grep -i posi
+
+Block Position: 45819668
+
+[root@tpsrv119 ~]# sg_requests -H -vvv /dev/sg2
+
+open /dev/sg2 with flags=0x800
+
+    Request Sense cmd: 03 00 00 00 fc 00
+
+      duration=0 ms
+
+    request sense: pass-through requested 252 bytes but got 96 bytes
+
+00     70 00 00 00 00 00 00 58  00 00 00 00 00 00 30 00
+10     00 00 00 00 01 01 4c 38  30 30 31 31 4c cb 00 00
+20     bf 08 66 00 00 00 00 66  81 00 70 4c 38 02 bb 27
+30     14 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+40     00 00 00 00 00 00 07 00  07 09 00 00 00 00 00 00
+50     00 00 00 00 00 00 38 31  38 30 31 33 30 30 37 38
+
+Where:
+
+cbh = 203 wrap
+
+02h bbh 27h 14h = 2bb2714h = 45819668 logical block
+
+bfh 08h = bf08h = 48904 relative position within the wrap (decreasing as we are nearing BOT)
+
+-------------------------------------------------------
+
+From the above, we know number of wraps as well as relative position within the wrap.
+
+What we do not have is a map of the starting logical blocks for our files and their relative position within the wrap for each of our tapes.
+
+We can scan the tapes (let’s say for each tape select 100 files to position to, to roughly calculate where the starting blocks are on each wrap)?
+
+And/or we can modify tapeserverd to store that relative position within the wrap for all newly written tapes. Once that is done, repack existing LTO tapes.
+
+What do you propose now?
+
+Bon weekend. Cheers,
+
+Vlado
+
+ 
+
+ 
+From: German Cancio Melia
+Sent: piatok, 3. augusta 2018 14:14
+To: Vladimir Bahyl <Vladimir.Bahyl@cern.ch>
+Subject: Re: LTO drive tests (aiming at RAO functionality)
+
+Vlado,
+
+thanks - I will check later…
+
+with regard to determining the physical position of the tape, the request sense SCSI command is probably useful - see the attached LTO SCSI manual on page 157, bytes 29 and 30-33 that indicate the current wrap, direction and position of the head -
+maybe you can give it a try on a few positions and let me know what you find?
+
+This command would also help us to avoid having to reposition in order to assess the whereabouts of the head. It could be used during writing to log after every N segments (depending on how much the command takes) the position and therefore have a bit(or more?) better heuristics for RAO emulation.
+
+There is no SCSI command however to translate an arbitrary logical block into its physical counterparts and I bet my hat IBM wouldn’t give us access even if it would be implemented :-P
+
+cheers, Germán
+
+
+
+
+
+
+> On 3 Aug 2018, at 11:10, Vladimir Bahyl <Vladimir.Bahyl@cern.ch> wrote:
+> 
+> According to German Cancio Melia:
+>> unfortunately the data is yet not too clear… could we zoom in a bit and get the same with a spacing of 25 blocks instead (and cut down to 50K blocks)?
+> 
+> German,
+> 
+> The results of the 25 block skip (using the same drive and tape) are here:
+> 
+> /afs/cern.ch/project/castor/tape/tests/LTO/LTO-7M/LTO-7M-L70010-skip-rewind-25-blocks-0-50000.txt
+> 
+> In parallel, I remembered that there is the ITDT utility and I tried
+> to see if that one can give physical block position.
+> 
+> It has the 'qrypos' command which can give output like this (I even
+> installed IBM lin_tape drive to keep it happy):
+> 
+> [root@tpsrv114 IBM-tape-utilities]# /afs/cern.ch/project/castor/tape/IBM-tape-utilities/itdt/itdt -f /dev/IBMtape0n qrypos
+> Querying tape position....
+> 
+> Logical Tape position:
+> 
+>    Partition Number ........... 0
+>    Beginning of Partition ..... No
+>    Leading End of Partition ... No
+>    Current Block ID ........... 19785380 0x012DE6A4
+>    Next Block on Tape ......... 12DE6A4 0x012DE6A4
+>    Last Block Written ......... 12DE6A4 0x012DE6A4
+>    Blocks in Buffer ........... 0
+>    Bytes in Buffer ............ UNKNOWN
+> 
+> 
+> Physical Tape position:
+> 
+>    Partition Number ........... 0
+>    Beginning of Partition ..... No
+>    Leading End of Partition ... No
+>    Current Block ID ........... 19785380 0x012DE6A4
+>    Next Block on Tape ......... 12DE6A4 0x012DE6A4
+>    Last Block Written ......... 12DE6A4 0x012DE6A4
+>    Blocks in Buffer ........... 0
+>    Bytes in Buffer ............ UNKNOWN
+> 
+> Exit with code: 0
+> 
+> Using SCSI Generic driver (and different running CMS tape L70100)
+> the output can be seen like this:
+> 
+> [root@tpsrv115 ~]# /afs/cern.ch/project/castor/tape/IBM-tape-utilities/itdt/itdt -f H2-B0-T0-L0 qrypos
+> Querying tape position....
+> 
+> Logical Tape position:
+> 
+>    Partition Number ........... 0
+>    Beginning of Partition ..... No
+>    Leading End of Partition ... No
+>    Current Block ID ........... 5770097 0x00580B71
+>    Next Block on Tape ......... 3538302D 0x3538302D
+>    Last Block Written ......... 580B71 0x00580B71
+>    Blocks in Buffer ........... 0
+>    Bytes in Buffer ............ UNKNOWN
+> 
+> 
+> Physical Tape position:
+> 
+>    Partition Number ........... 0
+>    Beginning of Partition ..... No
+>    Leading End of Partition ... No
+>    Current Block ID ........... 5770098 0x00580B72
+>    Next Block on Tape ......... 3538302D 0x3538302D
+>    Last Block Written ......... 580B72 0x00580B72
+>    Blocks in Buffer ........... 0
+>    Bytes in Buffer ............ UNKNOWN
+> 
+> Exit with code: 0
+> 
+> Unfortunately, from the ITDT man page:
+> 
+> https://www-01.ibm.com/support/docview.wss?uid=ssg1S7002972&aid=1
+> 
+> page 220:
+> 
+> "Note: ITDT does not distinguish between logical and physical position.
+> It shows the current position and queries for the one to set, then sets
+> the new position."
+> 
+> Nonetheless, I do not understand what do "Next Block on Tape" and
+> "Last Block Written" really mean as that is nowhere explained in the
+> documentation. I also think that these values might be swapped and the
+> decimal interpretation of the numbers is simply missing.
+> 
+> I think it might be worth now to contact IBM and ask them about those
+> ITDT discrepancies - and also if there is a way to identify physical
+> block position on LTO tape.
+> 
+> What do you think? Let me know (on Tuesday of course when you are back).
+> 
+> Cheers,
+> 
+>                        Vlado

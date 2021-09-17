@@ -1,0 +1,79 @@
+Date: Thu, 3 Aug 2017 17:47:16 +0200
+From: German Cancio Melia <German.Cancio.Melia@cern.ch>
+To: "castor-tape-dev (castor tape developments)" <castor-tape-dev@cern.ch>
+Subject: WFE - reducing wait between WFE invocations from 10s to 2s
+
+All,
+
+in order to minimise CTA request pileups, I have reduced the wait time between
+WFE invocations from 10s (default) to 1s. This way, WFE will be running more
+often, but finding (and therefore processing) less jobs in the incoming /q/
+queue. It should help minimising overloads.
+
+[root@p06253947b39467 mgm]# eos space config default space.wfe.interval=1
+success: setting wfe.interval=1
+
+cheers, Germán
+
+-----------------------------------------------------------------
+
+Date: Mon, 14 Aug 2017 14:40:02 +0200
+From: Steven Murray <Steven.Murray@cern.ch>
+To: Vlado Bahyl <Vladimir.Bahyl@cern.ch>
+CC: German Cancio Melia <German.Cancio.Melia@cern.ch>, Eric Cano <Eric.Cano@cern.ch>
+Subject: Fwd: add ceiling for concurrent jobs
+
+Hi Vlado,
+
+Andreas has asked us to try the “space.wfe.ntx" configuration parameter again.
+ We know that German was not convinced of the usefulness of this parameter,
+however Andreas says that we should monitor the “ntx” column of “eos space ls”
+command in order to see what is happening.  Andreas did a test of his own and
+saw the thread limiting working as expected.  Let’s see if we are experiencing
+a different behaviour with our production eosctatape instance.
+
+The command to set the “space.wfe.ntx” parameter is as follows:
+
+    eos space config default space.wfe.ntx=10
+
+The command to monitor the current number of threads is
+
+    eos space ls
+
+Cheers,
+
+Steve
+
+-----------------------------------------------------------------
+
+Date: Mon, 21 Aug 2017 15:41:25 +0200
+From: German Cancio Melia <German.Cancio.Melia@cern.ch>
+To: "castor-tape-dev (castor tape developments)" <castor-tape-dev@cern.ch>
+Subject: Re: EOS log recompaction
+
+Compaction didn’t run last week. It seems the compaction setting got lost since
+the last reboot.
+
+root@p06253947b39467 md]#  eos ns
+#
+------------------------------------------------------------------------------------
+# Namespace Statistic
+#
+------------------------------------------------------------------------------------
+ALL      Files                            22966567 [booted] (542s)
+ALL      Directories                      152
+#
+....................................................................................
+ALL      Compactification                 status=off waitstart=0 interval=0
+ratio-file=0.0:1 ratio-dir=0.0:1
+
+Vlado, can you make the following setting persistent via Puppet? (but please do
+not run it now while stress test is ongoing)
+
+
+    eos ns compact on 1 604800 all
+
+
+cheers, Germán
+
+-----------------------------------------------------------------

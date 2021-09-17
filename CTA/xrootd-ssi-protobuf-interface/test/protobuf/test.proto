@@ -1,0 +1,94 @@
+// @project        XRootD SSI/Protocol Buffer Interface Project
+// @brief          Protocol buffer definitions for test client/server
+// @copyright      Copyright 2018 CERN
+// @license        This program is free software: you can redistribute it and/or modify
+//                 it under the terms of the GNU General Public License as published by
+//                 the Free Software Foundation, either version 3 of the License, or
+//                 (at your option) any later version.
+//
+//                 This program is distributed in the hope that it will be useful,
+//                 but WITHOUT ANY WARRANTY; without even the implied warranty of
+//                 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//                 GNU General Public License for more details.
+//
+//                 You should have received a copy of the GNU General Public License
+//                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+package test;
+
+
+
+//
+// Data record to test several data types
+//
+message Record {
+  double      test_double             =  1;
+  float       test_float              =  2;
+  int32       test_int32              =  3;
+  int64       test_int64              =  4;
+  uint32      test_uint32             =  5;
+  uint64      test_uint64             =  6;
+  sint32      test_sint32             =  7;
+  sint64      test_sint64             =  8;
+  fixed32     test_fixed32            =  9;
+  fixed64     test_fixed64            = 10;
+  sfixed32    test_sfixed32           = 11;
+  sfixed64    test_sfixed64           = 12;
+  bool        test_bool               = 13;
+  string      test_string             = 14;
+  bytes       test_bytes              = 15;
+}
+
+
+
+//
+// Requests sent to the Test Server
+//
+message Request {
+  enum CommandType {
+    SEND_METADATA                     = 0;      //< Send a metadata-only response
+    SEND_DATA                         = 1;      //< Send a one-off data response
+    SEND_STREAM                       = 2;      //< Send a stream response
+  }
+  CommandType cmd                     = 1;      //< Command to send to server
+  uint32 repeat                       = 2;      //< Number of records to return in a stream response
+  uint32 delay_ms                     = 3;      //< Delay in ms before the server sends the Response to this Request
+  Record record                       = 4;      //< Test data record
+}
+
+
+
+//
+// Metadata responses sent by the Test Server
+//
+message Response {
+  enum ResponseType {
+    RSP_INVALID                       = 0;      //< Response type was not set
+    RSP_SUCCESS                       = 1;      //< Request is valid and was accepted for processing
+    RSP_ERR_PROTOBUF                  = 2;      //< Framework error caused by Google Protocol Buffers layer
+    RSP_ERR_SERVER                    = 3;      //< Server error
+    RSP_ERR_USER                      = 4;      //< User request is invalid
+  }
+  ResponseType type                   = 1;      //< Encode the type of this response
+  string message_txt                  = 2;      //< Optional response message text
+}
+
+
+
+//
+// Stream/Data responses sent by the Test Server
+//
+message Data {
+  Record record                       = 1;      //< Response record
+}
+
+
+
+//
+// Alert Messages
+//
+message Alert {
+  string message_txt                  = 1;      //< Text of the alert message
+}
+
