@@ -36,6 +36,8 @@ spec:
     command: ['/opt/run/bin/ctacli.sh']
     args: ["none"]
     volumeMounts:
+    - mountPath: /cta_rpms
+      name: cta
     - mountPath: /shared
       name: shared
     - mountPath: /mnt/logs
@@ -44,6 +46,9 @@ spec:
       privileged: true
 
   volumes:
+  - name: cta
+    hostPath:
+      path: /cta_rpms
   - name: shared
     hostPath:
       path: /opt/cta
