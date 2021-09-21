@@ -15,4 +15,4 @@
 #                 You should have received a copy of the GNU General Public License
 #                 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-(eval $(minikube -p minikube docker-env); cd ~/CTA; sudo -E docker build . -f continuousintegration/docker/ctafrontend/cc7/doublebuildtree-stage2b-scripts/Dockerfile -t doublebuildtree-runner)
+(eval $(minikube -p minikube docker-env); cd ~/CTA-minikube/CTA; sudo -E docker build . -f continuousintegration/docker/ctafrontend/cc7/doublebuildtree-stage2b-scripts/Dockerfile -t doublebuildtree-runner)

@@ -17,6 +17,11 @@
 
 . /opt/run/bin/init_pod.sh
 
+if [ -e /cta_rpms ]; then
+  echo 'Installing CTA RPMs'
+  /usr/bin/yum install -y /cta_rpms/cta-*
+fi
+
 if [ ! -e /etc/buildtreeRunner ]; then
   yum-config-manager --enable cta-artifacts
   yum-config-manager --enable ceph

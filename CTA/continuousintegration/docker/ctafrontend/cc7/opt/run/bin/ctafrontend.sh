@@ -139,11 +139,14 @@ if [ "-${CI_CONTEXT}-" == '-nosystemd-' ]; then
   # Not sure why /home/cta ends up ro but fix that
   mount -o remount,rw /home/cta
 
+  /usr/bin/yum-config-manager --disable cta
+
   # Copying xroot conf from mounted fs, symbolic link doesn't work
   if [ -e /xroot_plugins ]; then
     echo 'Copying xroot conf'
     rm -rf /etc/cta/cta-frontend-xrootd.conf
     cp /xroot_plugins/cta-frontend-xrootd.conf /etc/cta/cta-frontend-xrootd.conf
+    echo "cta.objectstore.backendpath $OBJECTSTOREURL" >> /etc/cta/cta-frontend-xrootd.conf
   fi
 
   runuser --shell='/bin/bash' --session-command='cd ~cta; xrootd -l /var/log/cta-frontend-xrootd.log -k fifo -n cta -c /etc/cta/cta-frontend-xrootd.conf -I v4' cta
