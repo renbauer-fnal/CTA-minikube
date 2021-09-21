@@ -36,6 +36,10 @@ spec:
     command: ['/opt/run/bin/ctafrontend.sh']
     args: ["none"]
     volumeMounts:
+    - mountPath: /xroot_plugins
+      name: xroot-plugins
+    - mountPath: /cta_rpms
+      name: cta
     - mountPath: /shared
       name: shared
     - mountPath: /etc/config/objectstore
@@ -56,6 +60,12 @@ spec:
       name: ctafrontend
       protocol: TCP
   volumes:
+  - name: xroot-plugins
+    hostPath:
+      path: /xroot_plugins
+  - name: cta
+    hostPath:
+      path: /cta_rpms
   - name: shared
     hostPath:
       path: /opt/cta

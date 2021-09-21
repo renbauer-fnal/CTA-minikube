@@ -17,6 +17,67 @@
 
 . /opt/run/bin/init_pod.sh
 
+if [ -e /cta_rpms ]; then
+  echo 'Installing CTA RPMs'
+  /usr/bin/yum install -y /cta_rpms/cta-*
+fi
+
+if [ -e /xroot_plugins ]; then
+  echo 'Copying xroot conf'
+  rm -rf /etc/cta/cta-frontend-xrootd.conf
+  cp /xroot_plugins/cta-frontend-xrootd.conf /etc/cta/cta-frontend-xrootd.conf
+fi
+
+if [ ! -e /etc/buildtreeRunner ]; then
+  # enable cta repository from previously built artifacts
+  yum-config-manager --enable cta-artifacts
+  yum-config-manager --enable ceph
+
+  # install needed packages
+  yum -y install cta-objectstore-tools mt-st mtx lsscsi sg3_utils cta-catalogueutils ceph-common oracle-instantclient19.3-sqlplus oracle-instantclient-tnsnames.ora
+  yum clean packages
+fi
+
+echo "Using this configuration for library:"
+/opt/run/bin/init_library.sh
+cat /tmp/library-rc.sh
+. /tmp/library-rc.sh
+
+echo "Configuring objectstore:"
+/opt/run/bin/init_objectstore.sh
+. /tmp/objectstore-rc.sh
+
+if [ "$KEEP_OBJECTSTORE" == "0" ]; then
+  echo "Wiping objectstore"
+  if [ "$OBJECTSTORETYPE" == "file" ]; then
+    rm -fr $OBJECTSTOREURL
+    mkdir -p $OBJECTSTOREURL
+    cta-objectstore-initialize $OBJECTSTOREURL || die "ERROR: Could not Wipe the objectstore. cta-objectstore-initialize $OBJECTSTOREURL FAILED"
+    chmod -R 777 $OBJECTSTOREURL
+  else
+    if [[ $(rados -p $OBJECTSTOREPOOL --id $OBJECTSTOREID --namespace $OBJECTSTORENAMESPACE ls | wc -l) -gt 0 ]]; then
+      echo "Rados objectstore ${OBJECTSTOREURL} is not empty: deleting content"
+      rados -p $OBJECTSTOREPOOL --id $OBJECTSTOREID --namespace $OBJECTSTORENAMESPACE ls | xargs -L 100 -P 100 rados -p $OBJECTSTOREPOOL --id $OBJECTSTOREID --namespace $OBJECTSTORENAMESPACE rm
+    fi
+    cta-objectstore-initialize $OBJECTSTOREURL || die "ERROR: Could not Wipe the objectstore. cta-objectstore-initialize $OBJECTSTOREURL FAILED"
+    echo "Rados objectstore ${OBJECTSTOREURL} content:"
+    rados -p $OBJECTSTOREPOOL --id $OBJECTSTOREID --namespace $OBJECTSTORENAMESPACE ls
+  fi
+else
+  echo "Reusing objectstore (no check)"
+fi
+
+. /opt/run/bin/init_pod.sh
+
+# oracle sqlplus client binary path
+ORACLE_SQLPLUS="/usr/bin/sqlplus64"
+
+die() {
+  stdbuf -i 0 -o 0 -e 0 echo "$@"
+  sleep 1
+  exit 1
+}
+
 if [ ! -e /etc/buildtreeRunner ]; then
 yum-config-manager --enable cta-artifacts
 yum-config-manager --enable ceph
@@ -74,6 +135,16 @@ if [ "-${CI_CONTEXT}-" == '-nosystemd-' ]; then
   echo 'echo "Setting environment variables for cta-frontend"' > /tmp/cta-frontend_env
   cat /etc/sysconfig/cta-frontend | sed -e 's/^/export /' >> /tmp/cta-frontend_env
   source /tmp/cta-frontend_env
+
+  # Not sure why /home/cta ends up ro but fix that
+  mount -o remount,rw /home/cta
+
+  # Copying xroot conf from mounted fs, symbolic link doesn't work
+  if [ -e /xroot_plugins ]; then
+    echo 'Copying xroot conf'
+    rm -rf /etc/cta/cta-frontend-xrootd.conf
+    cp /xroot_plugins/cta-frontend-xrootd.conf /etc/cta/cta-frontend-xrootd.conf
+  fi
 
   runuser --shell='/bin/bash' --session-command='cd ~cta; xrootd -l /var/log/cta-frontend-xrootd.log -k fifo -n cta -c /etc/cta/cta-frontend-xrootd.conf -I v4' cta
   echo "ctafrontend died"
