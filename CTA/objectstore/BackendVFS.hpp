@@ -24,7 +24,7 @@
 
 namespace cta { namespace objectstore {
 /**
- * An implementation of the object store primitives, using flock to lock,
+ * An implementation of the object store primitives, using lockf to lock,
  * so that several threads can compete for the same file (locks are per file
  * descriptor). The lock will be done on a special file (XXXX.lock), which will
  * not be moved (as opposed to the content itself, which needs to be moved to

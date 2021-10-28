@@ -242,7 +242,7 @@ void BackendVFS::ScopedLock::release() {
     std::cout << "Warning: fd=-1!" << std::endl;
   }
 #endif
-  ::flock(m_fd, LOCK_UN);
+  ::lockf(m_fd, LOCK_UN);
   ::close(m_fd);
   m_fdSet = false;
 #ifdef LOW_LEVEL_TRACING
@@ -282,11 +282,11 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
 
   if(timeout_us) {
     utils::Timer t;
-    while (::flock(ret->m_fd, type | LOCK_NB)) {
+    while (::lockf(ret->m_fd, type | LOCK_NB)) {
       if (errno != EWOULDBLOCK) {
         const std::string errnoStr = utils::errnoToString(errno);
         exception::Exception ex;
-        ex.getMessage() << "In BackendVFS::lockHelper(): Failed to flock file " << path <<
+        ex.getMessage() << "In BackendVFS::lockHelper(): Failed to lockf file " << path <<
           ": " << errnoStr;
         throw ex;
       }
@@ -295,10 +295,10 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
       }
     }
   } else {
-    if(::flock(ret->m_fd, type)) {
+    if(::lockf(ret->m_fd, type)) {
       const std::string errnoStr = utils::errnoToString(errno);
       exception::Exception ex;
-      ex.getMessage() << "In BackendVFS::lockHelper(): Failed to flock file " << path <<
+      ex.getMessage() << "In BackendVFS::lockHelper(): Failed to lockf file " << path <<
         ": " << errnoStr;
       throw ex;
     }
