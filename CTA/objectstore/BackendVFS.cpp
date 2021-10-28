@@ -297,7 +297,7 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
   if(timeout_us) {
     utils::Timer t;
     while (::fcntl(ret->m_fd, F_SETLK, &fl)) {
-      if (errno != EWOULDBLOCK) {
+      if (errno != EACCES and errno != EAGAIN) {
         const std::string errnoStr = utils::errnoToString(errno);
         exception::Exception ex;
         ex.getMessage() << "In BackendVFS::lockHelper(): Failed to fcntl lock file " << path <<
