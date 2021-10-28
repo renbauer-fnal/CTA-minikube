@@ -242,7 +242,9 @@ void BackendVFS::ScopedLock::release() {
     std::cout << "Warning: fd=-1!" << std::endl;
   }
 #endif
-  ::lockf(m_fd, LOCK_UN, 0);
+  struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
+  fl.pid = getpid();
+  ::fcntl(m_fd, F_SETLKW, &fl);
   ::close(m_fd);
   m_fdSet = false;
 #ifdef LOW_LEVEL_TRACING
@@ -282,11 +284,21 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
 
   if(timeout_us) {
     utils::Timer t;
-    while (::lockf(ret->m_fd, type | LOCK_NB, 0)) {
+    struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
+    fl.pid = getpid();
+    switch (type) {
+      case LOCK_SH :
+        fl.l_type = F_RDLCK;
+      break;
+      case LOCK_EX :
+        fl.l_type = F_WRLCK;
+      break;
+    }
+    while (::fcntl(ret->m_fd, F_SETLK, &fl)) {
       if (errno != EWOULDBLOCK) {
         const std::string errnoStr = utils::errnoToString(errno);
         exception::Exception ex;
-        ex.getMessage() << "In BackendVFS::lockHelper(): Failed to lockf file " << path <<
+        ex.getMessage() << "In BackendVFS::lockHelper(): Failed to fcntl lock file " << path <<
           ": " << errnoStr;
         throw ex;
       }
@@ -295,10 +307,20 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
       }
     }
   } else {
-    if(::lockf(ret->m_fd, type, 0)) {
+    struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
+    fl.pid = getpid();
+    switch (type) {
+      case LOCK_SH :
+        fl.l_type = F_RDLCK;
+      break;
+      case LOCK_EX :
+        fl.l_type = F_WRLCK;
+      break;
+    }
+    if(::fcntl(ret->m_fd, F_SETLKW, &fl)) {
       const std::string errnoStr = utils::errnoToString(errno);
       exception::Exception ex;
-      ex.getMessage() << "In BackendVFS::lockHelper(): Failed to lockf file " << path <<
+      ex.getMessage() << "In BackendVFS::lockHelper(): Failed to fcntl lock file " << path <<
         ": " << errnoStr;
       throw ex;
     }
