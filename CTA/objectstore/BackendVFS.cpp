@@ -243,7 +243,7 @@ void BackendVFS::ScopedLock::release() {
   }
 #endif
   struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-  fl.pid = getpid();
+  fl.l_pid = getpid();
   ::fcntl(m_fd, F_SETLKW, &fl);
   ::close(m_fd);
   m_fdSet = false;
@@ -285,7 +285,7 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
   if(timeout_us) {
     utils::Timer t;
     struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-    fl.pid = getpid();
+    fl.l_pid = getpid();
     switch (type) {
       case LOCK_SH :
         fl.l_type = F_RDLCK;
@@ -308,7 +308,7 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
     }
   } else {
     struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-    fl.pid = getpid();
+    fl.l_pid = getpid();
     switch (type) {
       case LOCK_SH :
         fl.l_type = F_RDLCK;
