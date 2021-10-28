@@ -255,7 +255,19 @@ void BackendVFS::ScopedLock::release() {
 BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint64_t timeout_us) {
   std::string path = m_root + "/." + name + ".lock";
   std::unique_ptr<ScopedLock> ret(new ScopedLock);
-  ret->set(::open(path.c_str(), O_RDONLY), path);
+  struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
+  fl.l_pid = getpid();
+  switch (type) {
+    case LOCK_EX :
+      fl.l_type = F_WRLCK;
+      ret->set(::open(path.c_str(), O_RDWR), path);
+    break;
+    case LOCK_SH :
+      fl.l_type = F_RDLCK;
+    default:
+      ret->set(::open(path.c_str(), O_RDONLY), path);
+    break;
+  }
 
   if(0 > ret->m_fd) {
     // We went too fast:  the fd is not really set:
@@ -284,16 +296,6 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
 
   if(timeout_us) {
     utils::Timer t;
-    struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-    fl.l_pid = getpid();
-    switch (type) {
-      case LOCK_SH :
-        fl.l_type = F_RDLCK;
-      break;
-      case LOCK_EX :
-        fl.l_type = F_WRLCK;
-      break;
-    }
     while (::fcntl(ret->m_fd, F_SETLK, &fl)) {
       if (errno != EWOULDBLOCK) {
         const std::string errnoStr = utils::errnoToString(errno);
@@ -307,16 +309,6 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
       }
     }
   } else {
-    struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-    fl.l_pid = getpid();
-    switch (type) {
-      case LOCK_SH :
-        fl.l_type = F_RDLCK;
-      break;
-      case LOCK_EX :
-        fl.l_type = F_WRLCK;
-      break;
-    }
     if(::fcntl(ret->m_fd, F_SETLKW, &fl)) {
       const std::string errnoStr = utils::errnoToString(errno);
       exception::Exception ex;
