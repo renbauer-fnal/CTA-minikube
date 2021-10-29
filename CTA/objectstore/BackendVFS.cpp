@@ -242,9 +242,6 @@ void BackendVFS::ScopedLock::release() {
     std::cout << "Warning: fd=-1!" << std::endl;
   }
 #endif
-  // struct flock fl = { F_UNLCK, SEEK_SET, 0, 0, 0 };
-  // fl.l_pid = getpid();
-  // ::fcntl(m_fd, F_SETLKW, &fl);
   ::flock(m_fd, LOCK_UN);
   ::close(m_fd);
   m_fdSet = false;
@@ -256,11 +253,8 @@ void BackendVFS::ScopedLock::release() {
 BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint64_t timeout_us) {
   std::string path = m_root + "/." + name + ".lock";
   std::unique_ptr<ScopedLock> ret(new ScopedLock);
-  // struct flock fl = { F_RDLCK, SEEK_SET, 0, 0, 0 };
-  // fl.l_pid = getpid();
   switch (type) {
     case LOCK_EX :
-      // fl.l_type = F_WRLCK;
       ret->set(::open(path.c_str(), O_RDWR), path);
       break;
     case LOCK_SH :
@@ -295,8 +289,6 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
 
   if(timeout_us) {
     utils::Timer t;
-    // while (::fcntl(ret->m_fd, F_SETLK, &fl)) {
-      // if (errno != EACCES and errno != EAGAIN) {
     while (::flock(ret->m_fd, type | LOCK_NB)) {
       if (errno != EWOULDBLOCK) {
         const std::string errnoStr = utils::errnoToString(errno);
@@ -310,7 +302,6 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
       }
     }
   } else {
-    // if(::fcntl(ret->m_fd, F_SETLKW, &fl)) {
     if (::flock(ret->m_fd, type)) {
       const std::string errnoStr = utils::errnoToString(errno);
       exception::Exception ex;
