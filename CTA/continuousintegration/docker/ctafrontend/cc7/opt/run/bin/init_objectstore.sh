@@ -57,6 +57,7 @@ EOF
     echo "Configuring file objectstore"
     OBJECTSTORETYPE=file
     OBJECTSTOREURL=$(echo $(get_conf objectstore.file.path) | sed -e "s#%NAMESPACE#${MY_NAMESPACE}#")
+    mkdir $OBJECTSTOREURL
   ;;
   *)
     echo "Error unknown objectstore type: $(get_conf objectstore.type)"

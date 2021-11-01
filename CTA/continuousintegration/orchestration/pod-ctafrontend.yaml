@@ -36,6 +36,8 @@ spec:
     command: ['/opt/run/bin/ctafrontend.sh']
     args: ["none"]
     volumeMounts:
+    - mountPath: /mnt/nfs
+      name: nfs
     - mountPath: /xroot_plugins
       name: xroot-plugins
     - mountPath: /cta_rpms
@@ -60,6 +62,9 @@ spec:
       name: ctafrontend
       protocol: TCP
   volumes:
+  - name: nfs
+    persistentVolumeClaim:
+      claimName: nfs
   - name: xroot-plugins
     hostPath:
       path: /xroot_plugins

@@ -7,4 +7,5 @@ metadata:
     type: file
 data:
   objectstore.type: file
-  objectstore.file.path: /shared/%NAMESPACE/objectstore
+  # objectstore.file.path: /shared/%NAMESPACE/objectstore
+  objectstore.file.path: /mnt/nfs/objectstore

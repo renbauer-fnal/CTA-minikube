@@ -205,7 +205,9 @@ fi
 
 echo -n "Creating ${instance} instance "
 
-kubectl create namespace ${instance} || die "FAILED"
+kubectl create namespace ${instance} || echo "WARNING: Namespace already exists. If this is not intended please run delete_instance.sh"
+
+sleep 10
 
 # The CTA registry secret must be copied in the instance namespace to be usable
 kubectl get secret ${ctareg_secret} &> /dev/null
