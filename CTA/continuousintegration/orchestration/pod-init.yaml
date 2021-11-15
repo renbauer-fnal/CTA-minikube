@@ -44,6 +44,8 @@ spec:
     command: ['/opt/run/bin/init.sh']
     args: ["none"]
     volumeMounts:
+    - mountPath: /mnt/nfs
+      name: nfs
     - mountPath: /cta_rpms
       name: cta
     - mountPath: /shared
@@ -60,6 +62,9 @@ spec:
       privileged: true
 
   volumes:
+  - name: nfs
+    persistentVolumeClaim:
+      claimName: nfs
   - name: cta
     hostPath:
       path: /cta_rpms

@@ -118,7 +118,13 @@ TEST(ObjectStore,SorterInsertArchiveRequest){
   }
   sorter.flushAll(lc);
   for(auto& future: allFutures){
-    ASSERT_NO_THROW(std::get<1>(future).get());
+    try {
+      std::get<1>(future).get();
+    }
+    catch (std::exception const & err) {
+      FAIL() << err.what();
+    }
+    // ASSERT_NO_THROW(std::get<1>(future).get());
   }
 
   cta::objectstore::ScopedExclusiveLock sel(re);
@@ -803,7 +809,13 @@ TEST(ObjectStore,SorterInsertArchiveRequestNotFetched){
   sorter.flushAll(lc);
   
   for(auto& future: allFuturesArchive){
-    ASSERT_NO_THROW(std::get<1>(future).get());
+    try {
+      std::get<1>(future).get();
+    }
+    catch (std::exception const & err) {
+      FAIL() << err.what();
+    }
+    // ASSERT_NO_THROW(std::get<1>(future).get());
   }
   
   {

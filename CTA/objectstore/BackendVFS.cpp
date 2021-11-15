@@ -253,7 +253,14 @@ void BackendVFS::ScopedLock::release() {
 BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint64_t timeout_us) {
   std::string path = m_root + "/." + name + ".lock";
   std::unique_ptr<ScopedLock> ret(new ScopedLock);
-  ret->set(::open(path.c_str(), O_RDONLY), path);
+  switch (type) {
+    case LOCK_EX :
+      ret->set(::open(path.c_str(), O_RDWR), path);
+      break;
+    case LOCK_SH :
+    default:
+      ret->set(::open(path.c_str(), O_RDONLY), path);
+  }
 
   if(0 > ret->m_fd) {
     // We went too fast:  the fd is not really set:
@@ -295,7 +302,7 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
       }
     }
   } else {
-    if(::flock(ret->m_fd, type)) {
+    if (::flock(ret->m_fd, type)) {
       const std::string errnoStr = utils::errnoToString(errno);
       exception::Exception ex;
       ex.getMessage() << "In BackendVFS::lockHelper(): Failed to flock file " << path <<
