@@ -255,8 +255,8 @@ BackendVFS::ScopedLock * BackendVFS::lockHelper(std::string name, int type, uint
   std::unique_ptr<ScopedLock> ret(new ScopedLock);
   switch (type) {
     case LOCK_EX :
-      ret->set(::open(path.c_str(), O_RDWR), path);
-      break;
+      // ret->set(::open(path.c_str(), O_RDWR), path);
+      // break;
     case LOCK_SH :
     default:
       ret->set(::open(path.c_str(), O_RDONLY), path);
