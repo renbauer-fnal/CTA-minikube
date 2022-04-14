@@ -1,1 +1,1 @@
-CTA RPMs must be built and added to ~/.minikube/files/cta_rpms
+CTA RPMs must be built and added to the ~/.minikube/files/cta_rpms dir, excepting cta-migration-tools. This is okay to omit if there are issues with oracle dependencies.
