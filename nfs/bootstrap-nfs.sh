@@ -6,6 +6,7 @@ for yaml in provisioner/local nfs-server-rc nfs-server-service; do
   kubectl apply -n cta -f ${yaml}.yaml;
 done;
 IP=""
+# IP="cta-eval-nfs.apps.okddev.fnal.gov"
 while [[ $IP != *.*.*.* ]]; do
   sleep 1;
   IP=$(kubectl describe service nfs-server -n cta | grep Endpoints | head -1 | awk '{print $2}' | awk -F: '{print $1}';)
