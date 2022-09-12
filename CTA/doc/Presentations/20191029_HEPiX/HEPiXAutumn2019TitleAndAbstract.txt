@@ -1,5 +1,0 @@
-TITLE
-Current status of tape storage at CERN
-
-ABSTRACT
-The IT storage group at CERN provides tape storage to its users in the form of three services, namely TSM, CASTOR and CTA.  Both TSM and CASTOR have been running for several decades whereas CTA is currently being deployed for the very first time.  This deployment is for the LHC experiments starting with ATLAS this year.  This contribution describes the current status of tape storage at CERN and expands on the strategy and architecture of the current deployment of CTA.
